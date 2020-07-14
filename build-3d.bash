@@ -5,6 +5,10 @@
 # req: OUTPUT_DEST
 # req: START_ID
 
+# opt: WORK_DIR
+
+WORK_DIR=${WORK_DIR-/dev/shm}
+
 function log {
     echo "[build-3d $(date +%X)]: $@"
 }
@@ -20,6 +24,7 @@ cwd=$PWD
 
 DOCKBASE=${DOCKBASE-/mnt/nfs/home/jklyu/zzz.github/DOCK3/DOCK}
 OUTPUT_BASE=$OUTPUT_DEST/$INPUT_FILENAME.build-3d.d
+WORK_BASE=$WORK_DIR/$INPUT_FILENAME.build-3d.d
 
 mkcd $OUTPUT_BASE
 
@@ -28,7 +33,10 @@ if [ -f $START_ID.tar.gz ]; then
     exit
 fi
 
+mkcd $WORK_BASE
 mkcd $START_ID
+
+rm -r *
 
 echo "$SMILES" > $START_ID.src
 
