@@ -22,7 +22,7 @@ MAX_PARALLEL=${MAX_PARALLEL-2500}
 NICE=${NICE-19}
 
 N_SMILES=`cat $INPUT_FILE | wc -l`
-user=`whoami`
+#user=`whoami`
 
 export INPUT_FILENAME=$(basename $INPUT_FILE)
 export OUTPUT_DEST
@@ -30,7 +30,7 @@ export OUTPUT_DEST
 p=1
 for i in `seq 100 100 $N_SMILES`; do
 
-    export SMILES=`cat $INPUT_FILE | sed -n '$p,$i p'`
+    export SMILES=`cat $INPUT_FILE | sed -n "$p,$i p"`
     export START_ID=$i
     export BATCH_ID=$((i/1000))
 
@@ -46,7 +46,8 @@ for i in `seq 100 100 $N_SMILES`; do
 
     while [ "$n_jobs" -ge "$MAX_PARALLEL" ]; then
         sleep 5
-        jobs=`squeue -p $SLURM_PARTITION -u $whoami | grep build_3d`
+        #jobs=`squeue -p $SLURM_PARTITION -u $whoami | grep build_3d`
+        jobs=`qstat | tail -n+2 | grep -v "\-\-\-\-\-"`
         n_jobs=`echo "$jobs" | wc -l`
     done
 
