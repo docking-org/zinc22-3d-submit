@@ -1,24 +1,28 @@
 #!/bin/bash
 
 # req: INPUT_FILE
-# req: SLURM_PARTITION
 # req: OUTPUT_DEST
 
 # opt: MAX_PARALLEL
-# opt: LOG_DIR
+# opt: LOG_BASE_DIR
 # opt: NICE
 
-LOG_DIR=${LOG_DIR-$PWD/logs}
+function log {
+    echo "[submit-all $(date +%X)]: $@"
+}
+
+function mkd {
+    if ! [ -d $1 ]; then
+        mkdir -p $1
+    fi
+}
+
+LOG_BASE_DIR=${LOG_BASE_DIR-$PWD/logs}
 MAX_PARALLEL=${MAX_PARALLEL-2500}
 NICE=${NICE-19}
 
 N_SMILES=`cat $INPUT_FILE | wc -l`
 user=`whoami`
-
-if ! [ -d $LOG_DIR ]; then
-    echo "failed to specify existing LOG_DIR. Current value: LOG_DIR=$LOG_DIR"
-    exit
-fi
 
 export INPUT_FILENAME=$(basename $INPUT_FILE)
 export OUTPUT_DEST
@@ -28,13 +32,19 @@ for i in `seq 100 100 $N_SMILES`; do
 
     export SMILES=`cat $INPUT_FILE | sed -n '$p,$i p'`
     export START_ID=$i
+    export BATCH_ID=$((i/1000))
 
-    srun -o $LOG_DIR/build_3d_%j.out -J build_3d --nice=$NICE -p $SLURM_PARTITION build-3d.bash
+    LOG_DIR=$LOG_BASE_DIR/$INPUT_FILENAME/$BATCH_ID
+    mkd $LOG_DIR
 
-    jobs=`squeue -p $SLURM_PARTITION -u $whoami | grep build_3d`
+    qsub -o $LOG_DIR/build_3d_$i.out -N build_3d build-3d.bash
+    #srun -o $LOG_BASE_DIR/build_3d_%j.out -J build_3d --nice=$NICE -p $SLURM_PARTITION build-3d.bash
+
+    jobs=`qstat | tail -n+2 | grep -v "\-\-\-\-\-"`
+    #jobs=`squeue -p $SLURM_PARTITION -u $whoami | grep build_3d`
     n_jobs=`echo "$jobs" | wc -l`
 
-    while [ $n_jobs -eq $MAX_PARALLEL ]; then
+    while [ "$n_jobs" -ge "$MAX_PARALLEL" ]; then
         sleep 5
         jobs=`squeue -p $SLURM_PARTITION -u $whoami | grep build_3d`
         n_jobs=`echo "$jobs" | wc -l`
