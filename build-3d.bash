@@ -1,9 +1,15 @@
 #!/bin/bash
+#
+#$ -o /scratch 
+#$ -e /scratch
+#$ -cwd
+#$ -t 1-1000
 
-# req: INPUT_FILENAME
-# req: SMILES
-# req: OUTPUT_DEST
-# req: START_ID
+# req: JOB_ID
+# req: SGE_TASK_ID
+# req: INPUT
+# req: OUTPUT
+# req: LOGGING
 
 # opt: WORK_DIR
 
@@ -15,41 +21,44 @@ function log {
 
 function mkcd {
     if ! [ -d $1 ]; then
-        mkdir $1
+        mkdir -p $1
     fi
     cd $1
 }
 
 cwd=$PWD
 
-DOCKBASE=${DOCKBASE-/mnt/nfs/home/jklyu/zzz.github/DOCK3/DOCK}
-OUTPUT_BASE=$OUTPUT_DEST/$INPUT_FILENAME.build-3d.d
-WORK_BASE=$WORK_DIR/$INPUT_FILENAME.build-3d.d
-
-mkcd $OUTPUT_BASE
-
-if [ -f $START_ID.tar.gz ]; then
+if [ -f $OUTPUT/$SGE_TASK_ID.tar.gz ]; then
     log "results already present in $OUTPUT_BASE for this job, exiting..."
     exit
 fi
 
+WORK_BASE=$WORK_DIR/${JOB_ID}_${SGE_TASK_ID}.build-3d.d
 mkcd $WORK_BASE
-mkcd $START_ID
 
-rm -r *
+# cd $INPUT
+SPLIT_FILE=`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SGE_TASK_ID`
+cp $INPUT/$SPLIT_FILE $WORK_BASE/$SGE_TASK_ID
 
-echo "$SMILES" > $START_ID.src
+log SPLIT_FILE=$INPUT/$SPLIT_FILE
 
-log "starting build job on $INPUT_FILENAME/$START_ID"
+cd $WORK_BASE
+
+log "starting build job on $WORK_BASE/$SGE_TASK_ID"
+log `head $SGE_TASK_ID`
+log `wc -l $SGE_TASK_ID`
 
 # this will contain all the necessary exports, software, etc.
-# source $cwd/env_new_lig_build.sh
-# ${DOCKBASE}/common/on-one-core-py3 - ${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH.sh -H 7.4 --no-db $START_ID.src 2>&1 > $START_ID.log
+source $cwd/env_new_lig_build.sh
+export DEBUG=TRUE
+${DOCKBASE}/common/on-one-core-py3 - ${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH.sh -H 7.4 --no-db ${SGE_TASK_ID}
 
-log "finished build job on $INPUT_FILENAME/$START_ID"
+log "finished build job on $WORK_BASE/$SGE_TASK_ID"
 
-# tar -czf ../$START_ID.tar.gz finished/*
-# mv $START_ID.log ..
-cd ..
+tar -czf $SGE_TASK_ID.tar.gz finished/*
+mv $SGE_TASK_ID.tar.gz $OUTPUT
+mv /scratch/batch_3d*$JOB_ID*$SGE_TASK_ID* $LOGGING
 
-rm -r $START_ID
+cd $cwd
+
+rm -r $WORK_BASE
