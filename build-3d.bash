@@ -1,14 +1,11 @@
 #!/bin/bash
 #
-#$ -o /scratch 
-#$ -e /scratch
-#$ -cwd
-#$ -t 1-1000
-#$ -l s_rt=12:00:00
-#$ -l h_rt=12:05:00
+#SBATCH -o /tmp
+#SBATCH -e /tmp
+#SBATCH -a 1-1000
 
-# req: JOB_ID
-# req: SGE_TASK_ID
+# req: SLURM_JOB_ID
+# req: SLURM_ARRAY_TASK_ID
 # req: INPUT
 # req: OUTPUT
 # req: LOGGING
@@ -47,38 +44,38 @@ function mkcd {
     cd $1
 }
 
-if [ -f $OUTPUT/$SGE_TASK_ID.tar.gz ]; then
+if [ -f $OUTPUT/$SLURM_ARRAY_TASK_ID.tar.gz ]; then
     log "results already present in $OUTPUT_BASE for this job, exiting..."
-    mv /scratch/batch_3d*$JOB_ID*$SGE_TASK_ID* $LOGGING
+    mv /scratch/batch_3d*$SLURM_JOB_ID*$SLURM_ARRAY_TASK_ID* $LOGGING
     exit
 fi
 
-WORK_BASE=$WORK_DIR/${JOB_ID}_${SGE_TASK_ID}.build-3d.d
+WORK_BASE=$WORK_DIR/${SLURM_JOB_ID}_${SLURM_ARRAY_TASK_ID}.build-3d.d
 mkcd $WORK_BASE
 
 # cd $INPUT
-SPLIT_FILE=`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SGE_TASK_ID`
-cp $INPUT/$SPLIT_FILE $WORK_BASE/$SGE_TASK_ID
+SPLIT_FILE=`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
+cp $INPUT/$SPLIT_FILE $WORK_BASE/$SLURM_ARRAY_TASK_ID
 
 log SPLIT_FILE=$INPUT/$SPLIT_FILE
 
 cd $WORK_BASE
 
-log "starting build job on $WORK_BASE/$SGE_TASK_ID"
-log `head $SGE_TASK_ID`
-log `wc -l $SGE_TASK_ID`
+log "starting build job on $WORK_BASE/$SLURM_ARRAY_TASK_ID"
+log `head $SLURM_ARRAY_TASK_ID`
+log `wc -l $SLURM_ARRAY_TASK_ID`
 
 # this will contain all the necessary exports, software, etc.
 source $cwd/env_new_lig_build.sh
 export DOCKBASE=$WORK_DIR/DOCK
 export DEBUG=TRUE
-${DOCKBASE}/common/on-one-core-py3 - ${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH.sh -H 7.4 --no-db ${SGE_TASK_ID}
+${DOCKBASE}/common/on-one-core-py3 - ${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH.sh -H 7.4 --no-db ${SLURM_ARRAY_TASK_ID}
 
-log "finished build job on $WORK_BASE/$SGE_TASK_ID"
+log "finished build job on $WORK_BASE/$SLURM_ARRAY_TASK_ID"
 
-tar -czf $SGE_TASK_ID.tar.gz finished/*
-mv $SGE_TASK_ID.tar.gz $OUTPUT
-mv /scratch/batch_3d*$JOB_ID*$SGE_TASK_ID* $LOGGING
+tar -czf $SLURM_ARRAY_TASK_ID.tar.gz finished/*
+mv $SLURM_ARRAY_TASK_ID.tar.gz $OUTPUT
+mv /tmp/slurm*$SLURM_JOB_ID*$SLURM_ARRAY_TASK_ID* $LOGGING
 
 cd $cwd
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # debugging stage
-export SOFTBASE=/bks/soft
-export SOFTBASE2=~/soft
+export SOFTBASE=/nfs/soft
+export SOFTBASE2=$HOME/soft
 export PYTHONBASE=$SOFTBASE2/lig_build_py3-3.7
 #export DOCKBASE=$SOFTBASE2/DOCK
 export DOCKBASE=${DOCKBASE-$SOFTBASE2/DOCK}
@@ -42,7 +42,7 @@ export PATH="$SOFTBASE/corina/current:${PATH}"
 
 # so does openbabel
 # source $SOFTBASE/openbabel/openbabel-2.3.2/env.sh
-export OBABELBASE=$SOFTBASE2/openbabel-install
+export OBABELBASE=$SOFTBASE/openbabel/openbabel-2.3.2
 export PATH="${PATH}:${OBABELBASE}/bin"
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$OBABELBASE/lib
 
