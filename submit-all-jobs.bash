@@ -4,11 +4,9 @@
 # req: OUTPUT_DEST
 
 # opt: MAX_PARALLEL
-# opt: LOG_BASE_DIR
-# opt: NICE
 
 function log {
-    echo "[submit-all $(date +%X)]: $@"
+    echo "[submit-all $(date +%X)]: " $@
 }
 
 function mkd {
@@ -17,40 +15,50 @@ function mkd {
     fi
 }
 
-LOG_BASE_DIR=${LOG_BASE_DIR-$PWD/logs}
-MAX_PARALLEL=${MAX_PARALLEL-2500}
-NICE=${NICE-19}
-
-N_SMILES=`cat $INPUT_FILE | wc -l`
-#user=`whoami`
+MAX_PARALLEL=${MAX_PARALLEL-5000}
 
 export INPUT_FILENAME=$(basename $INPUT_FILE)
-export OUTPUT_DEST
+export OUTPUT_DEST=$OUTPUT_DEST/$INPUT_FILENAME.batch-3d.d
 
-p=1
-for i in `seq 100 100 $N_SMILES`; do
+if ! [ -z $WIPE_ALL ]; then
+    log "wiping all previous files before running..."
+    rm -r $OUTPUT_DEST/*
+fi
 
-    export SMILES=`cat $INPUT_FILE | sed -n "$p,$i p"`
-    export START_ID=$i
-    export BATCH_ID=$((i/1000))
+mkd $OUTPUT_DEST/in
+mkd $OUTPUT_DEST/out
+mkd $OUTPUT_DEST/log
 
-    LOG_DIR=$LOG_BASE_DIR/$INPUT_FILENAME/$BATCH_ID
-    mkd $LOG_DIR
+log "splitting file into sub-batches of 50,000..."
 
-    qsub -o $LOG_DIR/build_3d_$i.out -N build_3d build-3d.bash
-    #srun -o $LOG_BASE_DIR/build_3d_%j.out -J build_3d --nice=$NICE -p $SLURM_PARTITION build-3d.bash
+if [ `ls $OUTPUT_DEST/in | wc -l` -gt 0 ]; then rm -r $OUTPUT_DEST/in/*; fi
+split --suffix-length=3 --lines=50000 $INPUT_FILE $OUTPUT_DEST/in/
 
-    jobs=`qstat | tail -n+2 | grep -v "\-\-\-\-\-"`
-    #jobs=`squeue -p $SLURM_PARTITION -u $whoami | grep build_3d`
+for batch_50K in $OUTPUT_DEST/in/*; do
+    
+    log "processing batch: $batch_50K"
+    batch_name=$(basename $batch_50K)
+
+    export OUTPUT=$OUTPUT_DEST/out/$batch_name.d
+    export LOGGING=$OUTPUT_DEST/log/$batch_name.d
+    export INPUT=$batch_50K.d
+
+    mkd $OUTPUT
+    mkd $LOGGING
+    mkd $INPUT
+
+    split --suffix-length=3 --lines=50 $batch_50K $INPUT/
+    qsub -v OUTPUT=$OUTPUT -v LOGGING=$LOGGING -v INPUT=$INPUT -N batch_3d 'build-3d.bash'
+    log "submitted batch"
+
+    jobs=`qstat | tail -n+3 | grep batch_3d`
     n_jobs=`echo "$jobs" | wc -l`
-
-    while [ "$n_jobs" -ge "$MAX_PARALLEL" ]; then
+    while [ "$n_jobs" -ge $((MAX_PARALLEL/1000)) ]; do
         sleep 5
-        #jobs=`squeue -p $SLURM_PARTITION -u $whoami | grep build_3d`
-        jobs=`qstat | tail -n+2 | grep -v "\-\-\-\-\-"`
+        jobs=`qstat | tail -n+3 | grep batch_3d`
         n_jobs=`echo "$jobs" | wc -l`
     done
 
-    p=$((i+1))
+    log n_jobs=$n_jobs
 
 done
