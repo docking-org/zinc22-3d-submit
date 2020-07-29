@@ -63,13 +63,13 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     log "submitted batch"
 
     n_uniq=`squeue | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
-    n_jobs=`qstat | tail -n+2 | grep batch_3d | wc -l`
+    n_jobs=`squeue | tail -n+2 | grep batch_3d | wc -l`
     n_jobs=$((n_jobs-n_uniq))
     log "$n_uniq batches submitted, $n_jobs jobs running"
     while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $((MAX_PARALLEL/500)) ]; do
         sleep 120
         n_uniq=`squeue | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
-        n_jobs=`qstat | tail -n+2 | grep batch_3d | wc -l`
+        n_jobs=`squeue | tail -n+2 | grep batch_3d | wc -l`
         n_jobs=$((n_jobs-n_uniq))
         log "$n_uniq batches submitted, $n_jobs jobs running"
     done
