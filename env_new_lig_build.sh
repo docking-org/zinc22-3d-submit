@@ -3,7 +3,7 @@
 # debugging stage
 export SOFTBASE=/bks/soft
 export SOFTBASE2=~/soft
-export PYTHONBASE=$SOFTBASE2/lig_build_py3-3.7
+export PYTHONBASE=${PYTHONBASE-$SOFTBASE2/lig_build_py3-3.7}
 #export DOCKBASE=$SOFTBASE2/DOCK
 export DOCKBASE=${DOCKBASE-$SOFTBASE2/DOCK}
 

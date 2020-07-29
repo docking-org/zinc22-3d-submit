@@ -29,11 +29,24 @@ if ! [ -d $WORK_DIR/DOCK ]; then
         echo "untarring DOCK files"
 	cd $WORK_DIR
 	time tar -xzf DOCK.tar.gz
-else
-	# if other jobs have started while the first is un-tarring DOCK, we want to give the first some time to fully un-tar DOCK
-	sleep 1
 fi
 
+if ! [ -d /scratch/lig_build_py3-3.7 ]; then
+	mkdir /scratch/lig_build_py3-3.7
+	echo "copying python env"
+	time cp $HOME/soft/lig_build_py3-3.7.tar.gz /scratch/lig_build_py3-3.7
+	echo "untarring python env"
+	cd /scratch/lig_build_py3-3.7
+	time tar -xzf lig_build_py3-3.7.tar.gz
+	echo "done!" > .done
+else
+	while ! [ -f /scratch/lig_build_py3-3.7/.done ]; do
+		echo "waiting for python environment..."
+		sleep 1
+	done
+fi
+
+export PYTHONBASE=/scratch/lig_build_py3-3.7
 export DOCKBASE=$WORK_DIR/DOCK
 
 function log {
@@ -46,6 +59,8 @@ function mkcd {
     fi
     cd $1
 }
+
+log $(hostname)
 
 if [ -f $OUTPUT/$SGE_TASK_ID.tar.gz ]; then
     log "results already present in $OUTPUT_BASE for this job, exiting..."
@@ -69,7 +84,7 @@ log `head $SGE_TASK_ID`
 log `wc -l $SGE_TASK_ID`
 
 # this will contain all the necessary exports, software, etc.
-source $cwd/env_new_lig_build.sh
+source $cwd/env_new_lig_build.sh.t
 export DOCKBASE=$WORK_DIR/DOCK
 export DEBUG=TRUE
 ${DOCKBASE}/common/on-one-core-py3 - ${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH.sh -H 7.4 --no-db ${SGE_TASK_ID}
