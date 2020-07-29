@@ -4,7 +4,7 @@
 #SBATCH -e /tmp
 #SBATCH -a 1-1000
 
-# req: SLURM_JOB_ID
+# req: SLURM_ARRAY_JOB_ID
 # req: SLURM_ARRAY_TASK_ID
 # req: INPUT
 # req: OUTPUT
@@ -46,11 +46,11 @@ function mkcd {
 
 if [ -f $OUTPUT/$SLURM_ARRAY_TASK_ID.tar.gz ]; then
     log "results already present in $OUTPUT_BASE for this job, exiting..."
-    mv /scratch/batch_3d*$SLURM_JOB_ID*$SLURM_ARRAY_TASK_ID* $LOGGING
+    mv /scratch/batch_3d*$SLURM_ARRAY_JOB_ID*$SLURM_ARRAY_TASK_ID* $LOGGING
     exit
 fi
 
-WORK_BASE=$WORK_DIR/${SLURM_JOB_ID}_${SLURM_ARRAY_TASK_ID}.build-3d.d
+WORK_BASE=$WORK_DIR/${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.build-3d.d
 mkcd $WORK_BASE
 
 # cd $INPUT
@@ -75,7 +75,7 @@ log "finished build job on $WORK_BASE/$SLURM_ARRAY_TASK_ID"
 
 tar -czf $SLURM_ARRAY_TASK_ID.tar.gz finished/*
 mv $SLURM_ARRAY_TASK_ID.tar.gz $OUTPUT
-mv /tmp/slurm*$SLURM_JOB_ID*$SLURM_ARRAY_TASK_ID* $LOGGING
+mv /tmp/slurm*$SLURM_ARRAY_JOB_ID*$SLURM_ARRAY_TASK_ID* $LOGGING
 
 cd $cwd
 
