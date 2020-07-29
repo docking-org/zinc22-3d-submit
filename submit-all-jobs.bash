@@ -59,7 +59,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     mkd $INPUT
 
     split --suffix-length=3 --lines=50 $batch_50K $INPUT/
-    qsub -J batch_3d 'build-3d.bash'
+    sbatch -J batch_3d 'build-3d.bash'
     log "submitted batch"
 
     n_uniq=`squeue | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
