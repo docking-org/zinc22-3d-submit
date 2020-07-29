@@ -2,11 +2,13 @@
 
 # debugging stage
 export SOFTBASE=/bks/soft
-export PYTHONBASE=~/lig_build_py3-3.7
-export DOCKBASE=~/dock37/DOCK
+export SOFTBASE2=~/soft
+export PYTHONBASE=$SOFTBASE2/lig_build_py3-3.7
+#export DOCKBASE=$SOFTBASE2/DOCK
+export DOCKBASE=${DOCKBASE-$SOFTBASE2/DOCK}
 
 # amsol needs libg2c to work, which I've installed locally to wynton
-export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:~/soft/libf2c/usr/lib
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$SOFTBASE2
 export AMSOLEXE=$SOFTBASE/amsol/in-house/amsol7.1-colinear-fix/amsol7.1
 
 # Experimental changes to DOCK ligand pipeline
@@ -40,7 +42,7 @@ export PATH="$SOFTBASE/corina/current:${PATH}"
 
 # so does openbabel
 # source $SOFTBASE/openbabel/openbabel-2.3.2/env.sh
-export OBABELBASE=~/soft/openbabel-install
+export OBABELBASE=$SOFTBASE2/openbabel-install
 export PATH="${PATH}:${OBABELBASE}/bin"
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$OBABELBASE/lib
 

@@ -15,7 +15,9 @@ function mkd {
     fi
 }
 
-MAX_PARALLEL=${MAX_PARALLEL-5000}
+MAX_PARALLEL=${MAX_PARALLEL-15000}
+
+log MAX_PARALLEL=$MAX_PARALLEL
 
 export INPUT_FILENAME=$(basename $INPUT_FILE)
 export OUTPUT_DEST=$OUTPUT_DEST/$INPUT_FILENAME.batch-3d.d
@@ -31,17 +33,28 @@ mkd $OUTPUT_DEST/log
 
 log "splitting file into sub-batches of 50,000..."
 
-if [ `ls $OUTPUT_DEST/in | wc -l` -gt 0 ]; then rm -r $OUTPUT_DEST/in/*; fi
+if [ `ls $OUTPUT_DEST/in | wc -l` -eq 0 ]; then
 split --suffix-length=3 --lines=50000 $INPUT_FILE $OUTPUT_DEST/in/
+fi
+
+QUEUES=`qconf -sql | grep -v test | grep -v short | tr '\n' ' '`
 
 for batch_50K in $OUTPUT_DEST/in/*; do
-    
+    if [ -d $batch_50K ]; then
+        continue
+    fi    
+
     log "processing batch: $batch_50K"
     batch_name=$(basename $batch_50K)
 
     export OUTPUT=$OUTPUT_DEST/out/$batch_name.d
     export LOGGING=$OUTPUT_DEST/log/$batch_name.d
     export INPUT=$batch_50K.d
+
+    if [ $(ls $OUTPUT | wc -l) -ge 950 ]; then
+        echo "this batch is mostly done, going to skip it!"
+        continue
+    fi
 
     mkd $OUTPUT
     mkd $LOGGING
@@ -51,12 +64,16 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     qsub -v OUTPUT=$OUTPUT -v LOGGING=$LOGGING -v INPUT=$INPUT -N batch_3d 'build-3d.bash'
     log "submitted batch"
 
-    jobs=`qstat | tail -n+3 | grep batch_3d`
-    n_jobs=`echo "$jobs" | wc -l`
-    while [ "$n_jobs" -ge $((MAX_PARALLEL/1000)) ]; do
-        sleep 5
-        jobs=`qstat | tail -n+3 | grep batch_3d`
-        n_jobs=`echo "$jobs" | wc -l`
+    n_uniq=`qstat | tail -n+3 | grep batch_3d | awk '{print $1}' | sort -u | wc -l`
+    n_jobs=`qstat | tail -n+3 | grep batch_3d | wc -l`
+    n_jobs=$((n_jobs-n_uniq))
+    log "$n_uniq batches submitted, $n_jobs jobs running"
+    while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $((MAX_PARALLEL/500)) ]; do
+        sleep 120
+        n_uniq=`qstat | tail -n+3 | grep batch_3d | awk '{print $1}' | sort -u | wc -l`
+        n_jobs=`qstat | tail -n+3 | grep batch_3d | wc -l`
+        n_jobs=$((n_jobs-n_uniq))
+        log "$n_uniq batches submitted, $n_jobs jobs running"
     done
 
     log n_jobs=$n_jobs
