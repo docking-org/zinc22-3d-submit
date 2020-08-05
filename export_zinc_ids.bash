@@ -22,14 +22,13 @@ for partition in /local2/load/*; do
 
                 TRANCHE_NAME=`basename $tranche`
                 SUBSTANCE_FILE=$tranche/substance.txt
-                cat $SUBSTANCE_FILE | awk -v t=$TRANCHE_NAME '{print $1 " " t " " $3}' >> $EXPORT_TMP_FILE
-            
+		EXPORT_FILE=$EXPORT_DEST/${TRANCHE_NAME}.smi
+		EXPORT_TMP_FILE=$EXPORT_FILE.tmp
+                cat $SUBSTANCE_FILE | awk -v t=$TRANCHE_NAME '{print $1 " " t " " $3}' > $EXPORT_TMP_FILE
+            	python export_zinc_ids.py $EXPORT_TMP_FILE > $EXPORT_FILE
+		rm $EXPORT_TMP_FILE
+
             done
-
-            echo "exporting zinc ids..." 
-
-            python export_zinc_ids.py $EXPORT_TMP_FILE > $EXPORT_FILE
-            rm $EXPORT_TMP_FILE
 
             echo "done!"
         

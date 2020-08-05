@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-#SBATCH -o /tmp
-#SBATCH -e /tmp
+#SBATCH -o /tmp/slurm_%A_%a.out
+#SBATCH -e /tmp/slurm_%A_%a.err
 #SBATCH -a 1-1000
 
 # req: SLURM_ARRAY_JOB_ID
@@ -16,20 +16,35 @@ cwd=$PWD
 WORK_DIR=${WORK_DIR-/dev/shm}
 
 if ! [ -d $WORK_DIR/strainfilter_noH ]; then
-	echo "copying strainfilter files"
+        echo "copying strainfilter files"
         cp -r $HOME/soft/strainfilter_noH $WORK_DIR
 fi
 
 if ! [ -d $WORK_DIR/DOCK ]; then
-	echo "copying DOCK files"
-	time cp $HOME/soft/DOCK.tar.gz $WORK_DIR/DOCK.tar.gz
+        echo "copying DOCK files"
+        time cp $HOME/soft/DOCK.tar.gz $WORK_DIR/DOCK.tar.gz
         echo "untarring DOCK files"
-	cd $WORK_DIR
-	time tar -xzf DOCK.tar.gz
-else
-	# if other jobs have started while the first is un-tarring DOCK, we want to give the first some time to fully un-tar DOCK
-	sleep 1
+        cd $WORK_DIR
+        time tar -xzf DOCK.tar.gz
 fi
+
+if ! [ -f /tmp/lig_build_py3-3.7/.done ]; then
+        function build_py_env {
+        mkdir /tmp/lig_build_py3-3.7
+        echo "copying python env"
+        time cp $HOME/soft/lig_build_py3-3.7.tar.gz /tmp/lig_build_py3-3.7
+        echo "untarring python env"
+        cd /tmp/lig_build_py3-3.7
+        time tar -xzf lig_build_py3-3.7.tar.gz
+        echo "done!" > .done
+        }
+        flock -w 0 /tmp/lig_build.lock $cwd/cp_lig_build.bash
+fi
+
+while ! [ -f /tmp/lig_build_py3-3.7/.done ]; do
+        echo "waiting for python environment..."
+        sleep 2
+done
 
 export DOCKBASE=$WORK_DIR/DOCK
 
