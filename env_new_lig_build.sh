@@ -2,13 +2,12 @@
 
 # debugging stage
 export SOFTBASE=/nfs/soft
-export SOFTBASE2=$HOME/soft
-export PYTHONBASE=$SOFTBASE2/lig_build_py3-3.7
-#export DOCKBASE=$SOFTBASE2/DOCK
-export DOCKBASE=${DOCKBASE-$SOFTBASE2/DOCK}
+export PYTHONBASE=/tmp/$PYENV_VERSION
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$HOME/soft/lib
+#export PYTHONBASE=/tmp/lig_build_py3-3.7
 
 # amsol needs libg2c to work, which I've installed locally to wynton
-export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$SOFTBASE2
+# our cluster has it installed on most machines:
 export AMSOLEXE=$SOFTBASE/amsol/in-house/amsol7.1-colinear-fix/amsol7.1
 
 # Experimental changes to DOCK ligand pipeline
