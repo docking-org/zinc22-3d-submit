@@ -3,9 +3,8 @@
 #$ -o /scratch 
 #$ -e /scratch
 #$ -cwd
-#$ -t 1-1000
-#$ -l s_rt=12:00:00
-#$ -l h_rt=12:05:00
+#$ -l s_rt=2:00:00
+#$ -l h_rt=2:05:00
 
 # req: JOB_ID
 # req: SGE_TASK_ID
@@ -91,29 +90,38 @@ fi
 WORK_BASE=$WORK_DIR/${JOB_ID}_${SGE_TASK_ID}.build-3d.d
 mkcd $WORK_BASE
 
-# cd $INPUT
-SPLIT_FILE=`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SGE_TASK_ID`
-cp $INPUT/$SPLIT_FILE $WORK_BASE/$SGE_TASK_ID
+if [ -z $RESUBMIT ]; then
+	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
+	TARGET_FILE=$WORK_BASE/$SLURM_ARRAY_TASK_ID
+else
+	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
+	TARGET_FILE=$WORK_BASE/$(basename $SPLIT_FILE)
+fi
 
-log SPLIT_FILE=$INPUT/$SPLIT_FILE
+if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
+    log "results already present in $OUTPUT_BASE for this job, exiting..."
+    mv /scratch/batch_3d.e$JOB_ID.$SGE_TASK_ID $LOGGING/$(basename $TARGET_FILE).err
+    mv /scratch/batch_3d.o$JOB_ID.$SGE_TASK_ID $LOGGING/$(basename $TARGET_FILE).out
+    exit
+fi
 
+cp $SPLIT_FILE $TARGET_FILE
+log SPLIT_FILE=$SPLIT_FILE
 cd $WORK_BASE
 
-log "starting build job on $WORK_BASE/$SGE_TASK_ID"
-log `head $SGE_TASK_ID`
-log `wc -l $SGE_TASK_ID`
+log $(hostname)
+log "starting build job on $TARGET_FILE"
+log "len($TARGET_FILE)=$(cat $TARGET_FILE | wc -l)"
 
-# this will contain all the necessary exports, software, etc.
 source $cwd/env_new_lig_build.sh
 export DEBUG=TRUE
-${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH_btingle.sh -H 7.4 --no-db ${SGE_TASK_ID}
+${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH_btingle.sh -H 7.4 --no-db $(basename $TARGET_FILE)
 
-log "finished build job on $WORK_BASE/$SGE_TASK_ID"
+log "finished build job on $TARGET_FILE"
 
-#tar -czf $SGE_TASK_ID.tar.gz finished/*
-#mv $SGE_TASK_ID.tar.gz $OUTPUT
-mv working/output.tar.gz $OUTPUT/$SGE_TASK_ID.tar.gz
-mv /scratch/batch_3d*$JOB_ID*$SGE_TASK_ID* $LOGGING
+mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
+mv /scratch/batch_3d.e$JOB_ID.$SGE_TASK_ID $LOGGING/$(basename $TARGET_FILE).err
+mv /scratch/batch_3d.o$JOB_ID.$SGE_TASK_ID $LOGGING/$(basename $TARGET_FILE).out
 
 cd $cwd
 
