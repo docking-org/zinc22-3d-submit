@@ -15,6 +15,7 @@ function mkd {
     fi
 }
 
+MAX_BATCHES=40
 MAX_PARALLEL=${MAX_PARALLEL-15000}
 
 log MAX_PARALLEL=$MAX_PARALLEL
@@ -49,24 +50,40 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     export LOGGING=$OUTPUT_DEST/log/$batch_name.d
     export INPUT=$batch_50K.d
 
-    if [ $(ls $OUTPUT | wc -l) -ge 950 ]; then
-        echo "this batch is mostly done, going to skip it!"
-        continue
-    fi
-
     mkd $OUTPUT
     mkd $LOGGING
     mkd $INPUT
 
     split --suffix-length=3 --lines=50 $batch_50K $INPUT/
-    sbatch -J batch_3d 'build-3d.bash'
-    log "submitted batch"
+    n_submit=$(ls $INPUT | wc -l)
+
+    if [ -d $OUTPUT ]; then
+        log "checking existing output..."
+        all_input=$(ls $INPUT)
+        present=$(ls $OUTPUT | cut -d'.' -f1 | sort -n)
+        all=$(seq 1 $n_submit)
+        missing=$(printf "$present\n$all\n" | sort -n | uniq -u)
+        if [ $(printf "$missing" | wc -l) -gt 0 ]; then
+            mkd $INPUT/resubmit
+            for m in $missing; do
+                infile=$(printf "$all_input" | cut -d' ' -f$m)
+                cp $INPUT/$infile $INPUT/resubmit/$m
+            export RESUBMIT=TRUE
+            n_submit=$(ls $INPUT/resubmit)
+            log "resubmitting $n_submit failed items of $batch_50K"
+        fi
+    else
+        export RESUBMIT=
+    fi
+    
+    job_id=$(sbatch --parsable --array=1-$n_submit -J batch_3d 'build-3d.bash')
+    log "submitted batch with job_id=$job_id"
 
     n_uniq=`squeue | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
     n_jobs=`squeue | tail -n+2 | grep batch_3d | wc -l`
     n_jobs=$((n_jobs-n_uniq))
     log "$n_uniq batches submitted, $n_jobs jobs running"
-    while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $((MAX_PARALLEL/500)) ]; do
+    while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $MAX_BATCHES ]; do
         sleep 120
         n_uniq=`squeue | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
         n_jobs=`squeue | tail -n+2 | grep batch_3d | wc -l`

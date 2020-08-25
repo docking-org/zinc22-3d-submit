@@ -2,7 +2,6 @@
 #
 #SBATCH -o /tmp/slurm_%A_%a.out
 #SBATCH -e /tmp/slurm_%A_%a.err
-#SBATCH -a 1-1000
 
 # req: SLURM_ARRAY_JOB_ID
 # req: SLURM_ARRAY_TASK_ID
@@ -61,7 +60,7 @@ if ! [ -f $WORK_DIR/$DOCK_VERSION/.done ]; then
 	synchronize_all_but_first "extracting_dock" "cp $HOME/soft/$DOCK_VERSION.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf $DOCK_VERSION.tar.gz && echo > $DOCK_VERSION/.done && popd"
 fi
 if ! [ -f /tmp/$PYENV_VERSION/.done ]; then
-        synchronize_all_but_first "extracting_pyenv" "cp $HOME/soft/$PYENV_VERSION.tar.gz /tmp && pushd /tmp && time tar -xzf $PYENV_VERSION.tar.gz && echo > $PYENV_VERSION/.done && popd"
+    synchronize_all_but_first "extracting_pyenv" "cp $HOME/soft/$PYENV_VERSION.tar.gz /tmp && pushd /tmp && time tar -xzf $PYENV_VERSION.tar.gz && echo > $PYENV_VERSION/.done && popd"
 fi
 
 export DOCKBASE=$WORK_DIR/$DOCK_VERSION
@@ -86,22 +85,28 @@ fi
 WORK_BASE=$WORK_DIR/${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.build-3d.d
 mkcd $WORK_BASE
 
-SPLIT_FILE=`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
-cp $INPUT/$SPLIT_FILE $WORK_BASE/$SLURM_ARRAY_TASK_ID
-log SPLIT_FILE=$INPUT/$SPLIT_FILE
+if [ -z $RESUBMIT ]; then
+	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
+	TARGET_FILE=$WORK_BASE/$SLURM_ARRAY_TASK_ID
+else
+	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
+	TARGET_FILE=$WORK_BASE/$(basename $SPLIT_FILE)
+fi
+
+cp $SPLIT_FILE $TARGET_FILE
+log SPLIT_FILE=$SPLIT_FILE
 cd $WORK_BASE
 
 log $(hostname)
-log "starting build job on $WORK_BASE/$SLURM_ARRAY_TASK_ID"
-log `head $SLURM_ARRAY_TASK_ID`
-log `wc -l $SLURM_ARRAY_TASK_ID`
+log "starting build job on $TARGET_FILE"
+log "len($TARGET_FILE)=$(cat $TARGET_FILE | wc -l)"
 
 source $cwd/env_new_lig_build.sh
 export DEBUG=TRUE
-${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH_btingle.sh -H 7.4 --no-db ${SLURM_ARRAY_TASK_ID}
+${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH_btingle.sh -H 7.4 --no-db $(basename $TARGET_FILE)
 
-log "finished build job on $WORK_BASE/$SLURM_ARRAY_TASK_ID"
+log "finished build job on $TARGET_FILE"
 
-mv working/output.tar.gz $OUTPUT/$SLURM_ARRAY_TASK_ID.tar.gz
+mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
 if ! [ -z $LOGGING ]; then mv /tmp/slurm*$SLURM_ARRAY_JOB_ID*$SLURM_ARRAY_TASK_ID* $LOGGING; fi
 if [ -z $SKIP_DELETE ]; then rm -r $WORK_BASE; fi
