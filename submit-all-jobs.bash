@@ -19,6 +19,7 @@ MAX_BATCHES=40
 MAX_PARALLEL=${MAX_PARALLEL-15000}
 
 log MAX_PARALLEL=$MAX_PARALLEL
+log MAX_BATCHES=$MAX_BATCHES
 
 export INPUT_FILENAME=$(basename $INPUT_FILE)
 export OUTPUT_DEST=$OUTPUT_DEST/$INPUT_FILENAME.batch-3d.d
@@ -59,23 +60,25 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 
     if [ -d $OUTPUT ]; then
         log "checking existing output..."
-        all_input=$(ls $INPUT)
+        all_input=$(ls -l $INPUT | grep -v "^d" | awk '{print $9}')
         present=$(ls $OUTPUT | cut -d'.' -f1 | sort -n)
         all=$(seq 1 $n_submit)
         missing=$(printf "$present\n$all\n" | sort -n | uniq -u)
         if [ $(printf "$missing" | wc -l) -gt 0 ]; then
-            mkd $INPUT/resubmit
+            if [ -d $INPUT/resubmit ]; then rm -r $INPUT/resubmit; fi
+	    mkdir $INPUT/resubmit
             for m in $missing; do
-                infile=$(printf "$all_input" | cut -d' ' -f$m)
-                cp $INPUT/$infile $INPUT/resubmit/$m
-            export RESUBMIT=TRUE
-            n_submit=$(ls $INPUT/resubmit)
+                infile=$(printf "$all_input" | tr '\n' ' ' | cut -d' ' -f$m)
+		ln -s $INPUT/$infile $INPUT/resubmit/$m
+            done
+	    export RESUBMIT=TRUE
+            n_submit=$(ls $INPUT/resubmit | wc -l)
             log "resubmitting $n_submit failed items of $batch_50K"
         fi
     else
         export RESUBMIT=
     fi
-    
+
     job_id=$(sbatch --parsable --array=1-$n_submit -J batch_3d 'build-3d.bash')
     log "submitted batch with job_id=$job_id"
 

@@ -13,8 +13,8 @@
 
 cwd=$PWD
 export WORK_DIR=${WORK_DIR-/dev/shm}
-export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.4.1}
-export DOCK_VERSION=${DOCK_VERSION-DOCK.2.4.2}
+export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.4.2}
+export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
 export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
 
@@ -76,12 +76,6 @@ function mkcd {
     cd $1
 }
 
-if [ -f $OUTPUT/$SLURM_ARRAY_TASK_ID.tar.gz ]; then
-    log "results already present in $OUTPUT_BASE for this job, exiting..."
-    mv /tmp/slurm*$SLURM_ARRAY_JOB_ID*$SLURM_ARRAY_TASK_ID* $LOGGING
-    exit
-fi
-
 WORK_BASE=$WORK_DIR/${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.build-3d.d
 mkcd $WORK_BASE
 
@@ -91,6 +85,13 @@ if [ -z $RESUBMIT ]; then
 else
 	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
 	TARGET_FILE=$WORK_BASE/$(basename $SPLIT_FILE)
+fi
+
+if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
+    log "results already present in $OUTPUT_BASE for this job, exiting..."
+    mv /tmp/slurm*$SLURM_ARRAY_JOB_ID*$SLURM_ARRAY_TASK_ID*.out $LOGGING/$(basename $TARGET_FILE).out
+    mv /tmp/slurm*$SLURM_ARRAY_JOB_ID*$SLURM_ARRAY_TASK_ID*.err $LOGGING/$(basename $TARGET_FILE).err
+    exit
 fi
 
 cp $SPLIT_FILE $TARGET_FILE
