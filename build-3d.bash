@@ -89,8 +89,8 @@ fi
 
 if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
     log "results already present in $OUTPUT_BASE for this job, exiting..."
-    mv /tmp/slurm*$SLURM_ARRAY_JOB_ID*$SLURM_ARRAY_TASK_ID*.out $LOGGING/$(basename $TARGET_FILE).out
-    mv /tmp/slurm*$SLURM_ARRAY_JOB_ID*$SLURM_ARRAY_TASK_ID*.err $LOGGING/$(basename $TARGET_FILE).err
+    mv /tmp/slurm_$SLURM_ARRAY_JOB_ID_$SLURM_ARRAY_TASK_ID.out $LOGGING/$(basename $TARGET_FILE).out
+    mv /tmp/slurm_$SLURM_ARRAY_JOB_ID_$SLURM_ARRAY_TASK_ID.err $LOGGING/$(basename $TARGET_FILE).err
     exit
 fi
 
@@ -109,5 +109,8 @@ ${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH_btingle.sh -H 7.4 -
 log "finished build job on $TARGET_FILE"
 
 mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
-if ! [ -z $LOGGING ]; then mv /tmp/slurm*$SLURM_ARRAY_JOB_ID*$SLURM_ARRAY_TASK_ID* $LOGGING; fi
+if ! [ -z $LOGGING ]; then 
+	mv /tmp/slurm_$SLURM_ARRAY_JOB_ID_$SLURM_ARRAY_TASK_ID.out $LOGGING/$(basename $TARGET_FILE).out; 
+	mv /tmp/slurm_$SLURM_ARRAY_JOB_ID_$SLURM_ARRAY_TASK_ID.err $LOGGING/$(basename $TARGET_FILE).err;
+fi
 if [ -z $SKIP_DELETE ]; then rm -r $WORK_BASE; fi
