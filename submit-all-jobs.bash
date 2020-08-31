@@ -53,9 +53,12 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 
     mkd $OUTPUT
     mkd $LOGGING
-    mkd $INPUT
+    
+    if ! [ -d $INPUT ]; then
+        mkdir $INPUT
+        split --suffix-length=3 --lines=50 $batch_50K $INPUT/
+    fi
 
-    split --suffix-length=3 --lines=50 $batch_50K $INPUT/
     n_submit=$(ls $INPUT | wc -l)
 
     if [ -d $OUTPUT ]; then
@@ -72,14 +75,17 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 		        ln -s $INPUT/$infile $INPUT/resubmit/$m
             done
 	        export RESUBMIT=TRUE
-            n_submit=$(ls $INPUT/resubmit | wc -l)
+            n_submit=$(printf "$missing" | wc -l)
             log "resubmitting $n_submit failed items of $batch_50K"
-        fi
+        else
+	    log "all jobs present! moving on..."
+	    continue
+	fi
     else
         export RESUBMIT=
     fi
 
-    qsub -v OUTPUT=$OUTPUT -v LOGGING=$LOGGING -v INPUT=$INPUT -N batch_3d -t 1-$n_submit 'build-3d.bash'
+    qsub -v RESUBMIT=$RESUBMIT -v OUTPUT=$OUTPUT -v LOGGING=$LOGGING -v INPUT=$INPUT -N batch_3d -t 1-$n_submit 'build-3d.bash'
     log "submitted batch"
 
     n_uniq=`qstat | tail -n+3 | grep batch_3d | awk '{print $1}' | sort -u | wc -l`

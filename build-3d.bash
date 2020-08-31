@@ -15,13 +15,15 @@
 # opt: WORK_DIR
 
 cwd=$PWD
-export WORK_DIR=${WORK_DIR-/scratch}
-export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.1}
-export DOCK_VERSION=${DOCK_VERSION-DOCK.2.4.2}
+export WORK_DIR=${WORK_DIR-/scratch/build_3d}
+export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.4.2}
+export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.1}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
 export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
-export PYTHONBASE=/scratch/$PYENV_VERSION
+export PYTHONBASE=$WORK_DIR/$PYENV_VERSION
 export DOCKBASE=$WORK_DIR/${DOCK_VERSION}
+
+mkdir -p $WORK_DIR
 
 function synchronize_all_but_first {
         if [ -f /tmp/${1}.done ]; then return; fi # in the case of a particularly short running command, it might be done by the time another job even enters this function
@@ -32,6 +34,7 @@ function synchronize_all_but_first {
         else
                 sleep 5 && rm /tmp/${1}.done
         fi
+	echo
 }
 
 # any jobs that were cancelled previously should be cleaned up
@@ -61,7 +64,13 @@ if ! [ -f $DOCKBASE/.done ]; then
         synchronize_all_but_first "extracting_dock" "cp $HOME/soft/$DOCK_VERSION.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf $DOCK_VERSION.tar.gz && echo > $DOCK_VERSION/.done && popd"
 fi
 if ! [ -f $PYTHONBASE/.done ]; then
-        synchronize_all_but_first "extracting_pyenv" "cp $HOME/soft/$PYENV_VERSION.tar.gz /scratch && pushd /scratch && time tar -xzf $PYENV_VERSION.tar.gz && echo > $PYENV_VERSION/.done && popd"
+        synchronize_all_but_first "extracting_pyenv" "cp $HOME/soft/$PYENV_VERSION.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf $PYENV_VERSION.tar.gz && echo > $PYENV_VERSION/.done && popd"
+fi
+if ! [ -f $WORK_DIR/lib/.done ]; then
+	synchronize_all_but_first "extracting_libs" "cp $HOME/soft/lib.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf lib.tar.gz && echo > lib/.done && popd"
+fi
+if ! [ -f $WORK_DIR/openbabel-install/.done ]; then
+	synchronize_all_but_first "extracting_obabel" "cp $HOME/soft/openbabel-install.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf openbabel-install.tar.gz && echo > openbabel-install/.done && popd"
 fi
 
 function log {
@@ -77,24 +86,14 @@ function mkcd {
 
 log $(hostname)
 
-if [ -f $OUTPUT/$SGE_TASK_ID.tar.gz ]; then
-    log "results already present in $OUTPUT_BASE for this job, exiting..."
-    mv /scratch/batch_3d*$JOB_ID*$SGE_TASK_ID* $LOGGING
-    exit
-fi
-
-# clean up previous files we stored in ramdisk
-# not going to do this on wynton due to resource constraints
-#rm -r /dev/shm/*.build-3d.d
-
 WORK_BASE=$WORK_DIR/${JOB_ID}_${SGE_TASK_ID}.build-3d.d
 mkcd $WORK_BASE
 
 if [ -z $RESUBMIT ]; then
-	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
-	TARGET_FILE=$WORK_BASE/$SLURM_ARRAY_TASK_ID
+	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SGE_TASK_ID`
+	TARGET_FILE=$WORK_BASE/$SGE_TASK_ID
 else
-	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
+	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$SGE_TASK_ID`
 	TARGET_FILE=$WORK_BASE/$(basename $SPLIT_FILE)
 fi
 
