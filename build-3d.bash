@@ -26,7 +26,13 @@ export DOCKBASE=$WORK_DIR/${DOCK_VERSION}
 mkdir -p $WORK_DIR
 
 function synchronize_all_but_first {
-        if [ -f /tmp/${1}.done ]; then return; fi # in the case of a particularly short running command, it might be done by the time another job even enters this function
+        if [ -f /tmp/${1}.done ]; then 
+		if [ $(( (`date +%s` - `stat -L --format %Y /tmp/${1}.done`) > (10) )) ]; then
+			rm /tmp/${1}.done
+		else
+			return;
+		fi
+	fi # in the case of a particularly short running command, it might be done by the time another job even enters this function
         flock -w 0 /tmp/${1}.lock -c "printf ${1} && ${@:2} && echo > /tmp/${1}.done" && FIRST=TRUE
         if [ -z $FIRST ]; then
                 printf "waiting ${1}"
