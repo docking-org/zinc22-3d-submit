@@ -1,13 +1,8 @@
 #!/bin/bash
-#
-#$ -o /scratch 
-#$ -e /scratch
-#$ -cwd
-#$ -l s_rt=2:00:00
-#$ -l h_rt=2:05:00
 
-# req: JOB_ID
-# req: SGE_TASK_ID
+
+# req: JOB_ID // SLURM_ARRAY_JOB_ID
+# req: SGE_TASK_ID // SLURM_ARRAY_TASK_ID
 # req: INPUT
 # req: OUTPUT
 # req: LOGGING
@@ -15,7 +10,8 @@
 # opt: WORK_DIR
 
 cwd=$PWD
-export WORK_DIR=${WORK_DIR-/scratch/build_3d}
+export TEMPDIR=${TEMPDIR-/tmp}
+export WORK_DIR=${WORK_DIR-$TEMPDIR/build_3d}
 export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.4.2}
 export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.1}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
@@ -60,8 +56,8 @@ old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +180 -name '*.build-3d.d
 if [ $(echo "$old_work" | wc -l) -gt 1 ]; then
         synchronize_all_but_first "removing_old_work" "find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +120 -name '*.build-3d.d' | xargs rm -r"
 fi
-if [ -d /scratch/$OLD_PYENV_VERSION ]; then
-        synchronize_all_but_first "removing_old_pyenv" "rm -r /scratch/$OLD_PYENV_VERSION"
+if [ -d $WORK_DIR/$OLD_PYENV_VERSION ]; then
+        synchronize_all_but_first "removing_old_pyenv" "rm -r $WORK_DIR/$OLD_PYENV_VERSION"
 fi
 if [ -d $WORK_DIR/$OLD_DOCK_VERSION ]; then
         synchronize_all_but_first "removing_old_dock" "rm -r $WORK_DIR/$OLD_DOCK_VERSION"
@@ -78,6 +74,9 @@ fi
 if ! [ -f $WORK_DIR/openbabel-install/.done ]; then
 	synchronize_all_but_first "extracting_obabel" "cp $HOME/soft/openbabel-install.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf openbabel-install.tar.gz && echo > openbabel-install/.done && popd"
 fi
+if ! [ -f $WORK_DIR/jchem-19.15/.done ]; then
+        synchronize_all_but_first "extracting_jchem" "cp $HOME/soft/jchem-19.15.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf jchem-19.15.tar.gz && echo > jchem-19.15/.done && popd"
+fi
 
 function log {
     echo "[build-3d $(date +%X)]: $@"
@@ -92,21 +91,21 @@ function mkcd {
 
 log $(hostname)
 
-WORK_BASE=$WORK_DIR/${JOB_ID}_${SGE_TASK_ID}.build-3d.d
+WORK_BASE=$WORK_DIR/${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.build-3d.d
 mkcd $WORK_BASE
 
 if [ -z $RESUBMIT ]; then
-	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SGE_TASK_ID`
-	TARGET_FILE=$WORK_BASE/$SGE_TASK_ID
+	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
+	TARGET_FILE=$WORK_BASE/$SLURM_ARRAY_TASK_ID
 else
-	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$SGE_TASK_ID`
+	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
 	TARGET_FILE=$WORK_BASE/$(basename $SPLIT_FILE)
 fi
 
 if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
     log "results already present in $OUTPUT_BASE for this job, exiting..."
-    mv /scratch/batch_3d.e$JOB_ID.$SGE_TASK_ID $LOGGING/$(basename $TARGET_FILE).err
-    mv /scratch/batch_3d.o$JOB_ID.$SGE_TASK_ID $LOGGING/$(basename $TARGET_FILE).out
+    mv /scratch/batch_3d.e$SLURM_ARRAY_JOB_ID.$SLURM_ARRAY_TASK_ID $LOGGING/$(basename $TARGET_FILE).err
+    mv /scratch/batch_3d.o$SLURM_ARRAY_JOB_ID.$SLURM_ARRAY_TASK_ID $LOGGING/$(basename $TARGET_FILE).out
     exit
 fi
 
@@ -125,8 +124,8 @@ ${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH_btingle.sh -H 7.4 -
 log "finished build job on $TARGET_FILE"
 
 mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
-mv /scratch/batch_3d.e$JOB_ID.$SGE_TASK_ID $LOGGING/$(basename $TARGET_FILE).err
-mv /scratch/batch_3d.o$JOB_ID.$SGE_TASK_ID $LOGGING/$(basename $TARGET_FILE).out
+mv /scratch/batch_3d.e$SLURM_ARRAY_JOB_ID.$SLURM_ARRAY_TASK_ID $LOGGING/$(basename $TARGET_FILE).err
+mv /scratch/batch_3d.o$SLURM_ARRAY_JOB_ID.$SLURM_ARRAY_TASK_ID $LOGGING/$(basename $TARGET_FILE).out
 
 cd $cwd
 

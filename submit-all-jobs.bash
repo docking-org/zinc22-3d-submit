@@ -59,24 +59,27 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     n_submit=$(ls -l $INPUT | tail -n+2 | grep -v "^d" | wc -l)
 
     if [ -d $OUTPUT ]; then
+        n_present=$(stat --format=%s $OUTPUT)
+        if [ $((n_submit-n_present)) -lt 50 ]; then
+                log "this batch looks mostly done, moving on..."
+                continue
+        fi
+
+        export RESUBMIT=TRUE
         log "checking existing output..."
         all_input=$(ls -l $INPUT | tail -n+2 | grep -v "^d" | awk '{print $9}')
         present=$(ls $OUTPUT | cut -d'.' -f1 | sort -n)
         all=$(seq 1 $n_submit)
         missing=$(printf "$present\n$all\n" | sort -n | uniq -u)
-        if [ $(printf "$missing" | wc -l) -gt 50 ]; then
-            if [ -d $INPUT/resubmit ]; then rm -r $INPUT/resubmit; fi
-	        mkdir $INPUT/resubmit
-            for m in $missing; do
-                infile=$(printf "$all_input" | tr '\n' ' ' | cut -d' ' -f$m)
-		        ln -s $INPUT/$infile $INPUT/resubmit/$m
-            done
-	    export RESUBMIT=TRUE
-            n_submit=$(printf "$missing" | wc -l)
-            log "resubmitting $n_submit failed items of $batch_50K"
-        else
-	    log "most jobs present! moving on..."
-	    continue
+
+        if [ -d $INPUT/resubmit ]; then rm -r $INPUT/resubmit; fi
+        mkdir $INPUT/resubmit
+        for m in $missing; do
+            infile=$(printf "$all_input" | tr '\n' ' ' | cut -d' ' -f$m)
+            ln -s $INPUT/$infile $INPUT/resubmit/$m
+        done
+        n_submit=$(printf "$missing" | wc -l)
+        log "resubmitting $n_submit failed items of $batch_50K"
 	fi
     else
         export RESUBMIT=
@@ -85,17 +88,17 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     mkdir -p $OUTPUT
     mkdir -p $LOGGING
 
-    qsub -v WORK_DIR=$WORK_DIR -v RESUBMIT=$RESUBMIT -v OUTPUT=$OUTPUT -v LOGGING=$LOGGING -v INPUT=$INPUT -N batch_3d -t 1-$n_submit 'build-3d.bash'
-    log "submitted batch"
+    job_id=$(sbatch $SBATCH_ARGS --parsable --array=1-$n_submit -J batch_3d 'build-3d.bash')
+    log "submitted batch with job_id=$job_id"
 
-    n_uniq=`qstat | tail -n+3 | grep batch_3d | awk '{print $1}' | sort -u | wc -l`
-    n_jobs=`qstat | tail -n+3 | grep batch_3d | wc -l`
+    n_uniq=`squeue | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
+    n_jobs=`squeue | tail -n+2 | grep batch_3d | wc -l`
     n_jobs=$((n_jobs-n_uniq))
     log "$n_uniq batches submitted, $n_jobs jobs running"
-    while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $((MAX_PARALLEL/500)) ]; do
+    while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $MAX_BATCHES ]; do
         sleep 120
-        n_uniq=`qstat | tail -n+3 | grep batch_3d | awk '{print $1}' | sort -u | wc -l`
-        n_jobs=`qstat | tail -n+3 | grep batch_3d | wc -l`
+        n_uniq=`squeue | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
+        n_jobs=`squeue | tail -n+2 | grep batch_3d | wc -l`
         n_jobs=$((n_jobs-n_uniq))
         log "$n_uniq batches submitted, $n_jobs jobs running"
     done
