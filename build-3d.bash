@@ -1,5 +1,7 @@
 #!/bin/bash
 
+######SBATCH -o /tmp/batch_3d_%A_%a.out
+######SBATCH -e /tmp/batch_3d_%A_%a.err
 
 # req: JOB_ID // SLURM_ARRAY_JOB_ID
 # req: SGE_TASK_ID // SLURM_ARRAY_TASK_ID
@@ -10,7 +12,7 @@
 # opt: WORK_DIR
 
 cwd=$PWD
-export TEMPDIR=${TEMPDIR-/tmp}
+export TEMPDIR=${TEMPDIR-$SCRATCH}
 export WORK_DIR=${WORK_DIR-$TEMPDIR/build_3d}
 export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.4.2}
 export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.1}
@@ -77,6 +79,9 @@ fi
 if ! [ -f $WORK_DIR/jchem-19.15/.done ]; then
         synchronize_all_but_first "extracting_jchem" "cp $HOME/soft/jchem-19.15.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf jchem-19.15.tar.gz && echo > jchem-19.15/.done && popd"
 fi
+if ! [ -f $WORK_DIR/corina-2022/.done ]; then
+	synchronize_all_but_first "extracting_corina" "cp $HOME/soft/corina.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf corina.tar.gz && echo > corina-2022/.done && popd"
+fi
 
 function log {
     echo "[build-3d $(date +%X)]: $@"
@@ -104,8 +109,8 @@ fi
 
 if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
     log "results already present in $OUTPUT_BASE for this job, exiting..."
-    mv /scratch/batch_3d.e$SLURM_ARRAY_JOB_ID.$SLURM_ARRAY_TASK_ID $LOGGING/$(basename $TARGET_FILE).err
-    mv /scratch/batch_3d.o$SLURM_ARRAY_JOB_ID.$SLURM_ARRAY_TASK_ID $LOGGING/$(basename $TARGET_FILE).out
+    mv $TEMPDIR/batch_3d_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.err $LOGGING/$(basename $TARGET_FILE).err
+    mv $TEMPDIR/batch_3d_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.out $LOGGING/$(basename $TARGET_FILE).out
     exit
 fi
 
@@ -124,8 +129,8 @@ ${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH_btingle.sh -H 7.4 -
 log "finished build job on $TARGET_FILE"
 
 mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
-mv /scratch/batch_3d.e$SLURM_ARRAY_JOB_ID.$SLURM_ARRAY_TASK_ID $LOGGING/$(basename $TARGET_FILE).err
-mv /scratch/batch_3d.o$SLURM_ARRAY_JOB_ID.$SLURM_ARRAY_TASK_ID $LOGGING/$(basename $TARGET_FILE).out
+mv $TEMPDIR/batch_3d_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.err $LOGGING/$(basename $TARGET_FILE).err
+mv $TEMPDIR/batch_3d_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.out $LOGGING/$(basename $TARGET_FILE).out
 
 cd $cwd
 

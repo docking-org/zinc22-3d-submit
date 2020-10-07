@@ -15,8 +15,11 @@ function mkd {
     fi
 }
 
-MAX_BATCHES=40
-MAX_PARALLEL=${MAX_PARALLEL-15000}
+MAX_BATCHES=${MAX_BATCHES-20}
+MAX_PARALLEL=${MAX_PARALLEL-5000}
+LINES_PER_BATCH=${LINES_PER_BATCH-20000}
+LINES_PER_JOB=${LINES_PER_JOB-50}
+JOBS_PER_BATCH=$((LINES_PER_BATCH/LINES_PER_JOB))
 
 log MAX_PARALLEL=$MAX_PARALLEL
 log MAX_BATCHES=$MAX_BATCHES
@@ -33,10 +36,10 @@ mkd $OUTPUT_DEST/in
 mkd $OUTPUT_DEST/out
 mkd $OUTPUT_DEST/log
 
-log "splitting file into sub-batches of 50,000..."
+log "splitting file into sub-batches of $LINES_PER_BATCH..."
 
 if [ `ls $OUTPUT_DEST/in | wc -l` -eq 0 ]; then
-split --suffix-length=3 --lines=50000 $INPUT_FILE $OUTPUT_DEST/in/
+split --suffix-length=3 --lines=$LINES_PER_BATCH $INPUT_FILE $OUTPUT_DEST/in/
 fi
 
 for batch_50K in $OUTPUT_DEST/in/*; do
@@ -53,15 +56,15 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 
     if ! [ -d $INPUT ]; then
         mkdir $INPUT
-        split --suffix-length=3 --lines=50 $batch_50K $INPUT/
+        split --suffix-length=3 --lines=$LINES_PER_JOB $batch_50K $INPUT/
     fi
 
     n_submit=$(ls -l $INPUT | tail -n+2 | grep -v "^d" | wc -l)
 
     if [ -d $OUTPUT ]; then
-        n_present=$(stat --format=%s $OUTPUT)
-        if [ $((n_submit-n_present)) -lt 50 ]; then
-                log "this batch looks mostly done, moving on..."
+        n_present=$(ls $OUTPUT | wc -l)
+	if [ $((n_submit-n_present)) -lt $(((5 * n_submit)/100)) ]; then
+		log "this batch looks mostly done, ($((n_submit-n_present)))moving on..."
                 continue
         fi
 
@@ -80,25 +83,25 @@ for batch_50K in $OUTPUT_DEST/in/*; do
         done
         n_submit=$(printf "$missing" | wc -l)
         log "resubmitting $n_submit failed items of $batch_50K"
-	fi
     else
+	log "submitting $n_submit items of $batch_50K"
         export RESUBMIT=
     fi
 
     mkdir -p $OUTPUT
     mkdir -p $LOGGING
 
-    job_id=$(sbatch $SBATCH_ARGS --parsable --array=1-$n_submit -J batch_3d 'build-3d.bash')
+    job_id=$(sbatch $SBATCH_ARGS --parsable -o $SCRATCH/batch_3d_%A_%a.out -e $SCRATCH/batch_3d_%A_%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
     log "submitted batch with job_id=$job_id"
 
-    n_uniq=`squeue | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
-    n_jobs=`squeue | tail -n+2 | grep batch_3d | wc -l`
+    n_uniq=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
+    n_jobs=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | wc -l`
     n_jobs=$((n_jobs-n_uniq))
     log "$n_uniq batches submitted, $n_jobs jobs running"
     while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $MAX_BATCHES ]; do
         sleep 120
-        n_uniq=`squeue | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
-        n_jobs=`squeue | tail -n+2 | grep batch_3d | wc -l`
+	n_uniq=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
+	n_jobs=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | wc -l`
         n_jobs=$((n_jobs-n_uniq))
         log "$n_uniq batches submitted, $n_jobs jobs running"
     done
