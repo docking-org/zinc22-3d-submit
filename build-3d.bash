@@ -12,7 +12,7 @@
 # opt: WORK_DIR
 
 cwd=$PWD
-export TEMPDIR=${TEMPDIR-$SCRATCH}
+export TEMPDIR=${TEMPDIR-/tmp}
 export WORK_DIR=${WORK_DIR-$TEMPDIR/build_3d}
 export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.4.2}
 export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.1}
@@ -20,6 +20,17 @@ export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
 export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
 export PYTHONBASE=$WORK_DIR/$PYENV_VERSION
 export DOCKBASE=$WORK_DIR/${DOCK_VERSION}
+
+JOB_ID=${SLURM_ARRAY_JOB_ID-$JOB_ID}
+TASK_ID=${SLURM_ARRAY_TASK_ID-$SGE_TASK_ID}
+
+if [ -z $SLURM_ARRAY_JOB_ID ]; then
+        ERROR_LOG=$TEMPDIR/batch_3d.e${JOB_ID}.${TASK_ID}
+        OUTPUT_LOG=$TEMPDIR/batch_3d.o${JOB_ID}.${TASK_ID}
+else
+        ERROR_LOG=$TEMPDIR/batch_3d_${JOB_ID}_${TASK_ID}.err
+        OUTPUT_LOG=$TEMPDIR/batch_3d_${JOB_ID}_${TASK_ID}.out
+fi
 
 mkdir -p $WORK_DIR
 
@@ -87,31 +98,17 @@ function log {
     echo "[build-3d $(date +%X)]: $@"
 }
 
-function mkcd {
-    if ! [ -d $1 ]; then
-        mkdir -p $1
-    fi
-    cd $1
-}
-
 log $(hostname)
 
-WORK_BASE=$WORK_DIR/${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.build-3d.d
+WORK_BASE=$WORK_DIR/${JOB_ID}_${TASK_ID}.build-3d.d
 mkcd $WORK_BASE
 
 if [ -z $RESUBMIT ]; then
-	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
-	TARGET_FILE=$WORK_BASE/$SLURM_ARRAY_TASK_ID
+	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$TASK_ID`
+	TARGET_FILE=$WORK_BASE/$TASK_ID
 else
-	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$SLURM_ARRAY_TASK_ID`
+	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$TASK_ID`
 	TARGET_FILE=$WORK_BASE/$(basename $SPLIT_FILE)
-fi
-
-if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
-    log "results already present in $OUTPUT_BASE for this job, exiting..."
-    mv $TEMPDIR/batch_3d_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.err $LOGGING/$(basename $TARGET_FILE).err
-    mv $TEMPDIR/batch_3d_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.out $LOGGING/$(basename $TARGET_FILE).out
-    exit
 fi
 
 cp $SPLIT_FILE $TARGET_FILE
@@ -122,16 +119,46 @@ log $(hostname)
 log "starting build job on $TARGET_FILE"
 log "len($TARGET_FILE)=$(cat $TARGET_FILE | wc -l)"
 
+# move logs to their final destination & clean up the working directory
+cleanup() {
+        mv $ERROR_LOG $LOGGING/$(basename $TARGET_FILE).err
+        mv $OUTPUT_LOG $LOGGING/$(basename $TARGET_FILE).out
+        if [ -z $SKIP_DELETE ] && [ -d $WORK_BASE ]; then rm -r $WORK_BASE; fi
+        exit
+}
+
+# save our progress if we've reached the time limit. DOCK has not been modified to take advantage of this, so this doesn't do much as of yet
+# but this will be useful for re-doing as little work as possible in the future
+reached_time_limit() {
+        log "time limit reached! saving progress..."
+        tar -czf $(basename $TARGET_FILE).save.tar.gz .
+        mkdir -p $OUTPUT/save
+        mv $(basename $TARGET_FILE).save.tar.gz $OUTPUT/save
+        cleanup
+}
+
+# on sge, SIGUSR1 is sent once a job surpasses it's "soft" time limit (-l s_rt=XX:XX:XX), usually specified a minute or two before the hard time limit (-l h_rt=XX:XX:XX) where SIGTERM is sent
+# on slurm, the same can be achieved by adding the --signal=USR1@60 option to your sbatch args to send the SIGUSR1 signal 1 minute before the job is terminated
+trap reached_time_limit SIGUSR1
+
+# jobs that have output already shouldn't be resubmitted, but this is just in case that doesn't happen
+if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
+        log "results already present in $OUTPUT_BASE for this job, exiting..."
+        cleanup
+fi
+
+# un-archive our saved progress (if any) into the current working directory
+if [ -f $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz ]; then
+        tar -xzf $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz
+        rm $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz
+fi
+
 source $cwd/env_new_lig_build.sh
 export DEBUG=TRUE
-${DOCKBASE}/ligand/generate/build_database_ligand_strain_noH_btingle.sh -H 7.4 --no-db $(basename $TARGET_FILE)
+# this env variable used for debugging old versions only
+MAIN_SCRIPT_NAME=${MAIN_SCRIPT_NAME-build_database_ligand_strain_noH_btingle.sh}
+${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME -H 7.4 --no-db $(basename $TARGET_FILE)
 
 log "finished build job on $TARGET_FILE"
-
 mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
-mv $TEMPDIR/batch_3d_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.err $LOGGING/$(basename $TARGET_FILE).err
-mv $TEMPDIR/batch_3d_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.out $LOGGING/$(basename $TARGET_FILE).out
-
-cd $cwd
-
-if [ -z $SKIP_DELETE ]; then rm -r $WORK_BASE; fi
+cleanup

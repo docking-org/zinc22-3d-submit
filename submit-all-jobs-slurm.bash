@@ -4,6 +4,11 @@
 # req: OUTPUT_DEST
 
 # opt: MAX_PARALLEL
+# opt: MAX_BATCHES
+# opt: LINES_PER_BATCH
+# opt: LINES_PER_JOB
+# opt: QSUB_ARGS
+# opt: TEMPDIR
 
 function log {
     echo "[submit-all $(date +%X)]: " $@
@@ -15,6 +20,7 @@ function mkd {
     fi
 }
 
+TEMPDIR=${TEMPDIR-/tmp}
 MAX_BATCHES=${MAX_BATCHES-20}
 MAX_PARALLEL=${MAX_PARALLEL-5000}
 LINES_PER_BATCH=${LINES_PER_BATCH-20000}
@@ -63,7 +69,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 
     if [ -d $OUTPUT ]; then
         n_present=$(ls $OUTPUT | wc -l)
-	if [ $((n_submit-n_present)) -lt $(((5 * n_submit)/100)) ]; then
+	    if [ $((n_submit-n_present)) -lt $(((5 * n_submit)/100)) ]; then
 		log "this batch looks mostly done, ($((n_submit-n_present)))moving on..."
                 continue
         fi
@@ -91,17 +97,15 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     mkdir -p $OUTPUT
     mkdir -p $LOGGING
 
-    job_id=$(sbatch $SBATCH_ARGS --parsable -o $SCRATCH/batch_3d_%A_%a.out -e $SCRATCH/batch_3d_%A_%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
+    SBATCH_ARGS=${SBATCH_ARGS-"--time=02:00:00"}
+    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $SCRATCH/batch_3d_%A_%a.out -e $SCRATCH/batch_3d_%A_%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
     log "submitted batch with job_id=$job_id"
 
-    n_uniq=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
-    n_jobs=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | wc -l`
-    n_jobs=$((n_jobs-n_uniq))
-    log "$n_uniq batches submitted, $n_jobs jobs running"
-    while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $MAX_BATCHES ]; do
-        sleep 120
-	n_uniq=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
-	n_jobs=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | wc -l`
+    once=true
+    while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $MAX_BATCHES ] || ! [ -z $once ]; do
+        [ -z $once ] && sleep 120
+	    n_uniq=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
+	    n_jobs=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | wc -l`
         n_jobs=$((n_jobs-n_uniq))
         log "$n_uniq batches submitted, $n_jobs jobs running"
     done
