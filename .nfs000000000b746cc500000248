@@ -67,7 +67,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
         split --suffix-length=3 --lines=$LINES_PER_JOB $batch_50K $INPUT/
     fi
 
-    # it tends to be faster (if supported) to use du -s --inodes to count entries, as ls | wc -l can be slow
+    # it's much faster (if supported) to use du -s --inodes to count entires, as ls | wc -l tends to be quite slow
     n_submit=$(du -s --inodes $INPUT | awk '{print $1}')
     if [ -d $INPUT/resubmit ]; then
 	n_resubmit=$(du -s --inodes $INPUT/resubmit | awk '{print $1}')

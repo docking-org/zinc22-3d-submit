@@ -25,7 +25,7 @@ export OMEGA_RMSD=0.5
 # Dependencies
 
 # CORINA env.sh on wynton has an incorrect path specified
-export PATH="$WORK_DIR/corina-2022:${PATH}"
+export PATH="$WORK_DIR/corina:${PATH}"
 
 # so does openbabel
 export OBABELBASE=$WORK_DIR/openbabel-install

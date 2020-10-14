@@ -1,8 +1,5 @@
 #!/bin/bash
 
-######SBATCH -o /tmp/batch_3d_%A_%a.out
-######SBATCH -e /tmp/batch_3d_%A_%a.err
-
 # req: JOB_ID // SLURM_ARRAY_JOB_ID
 # req: SGE_TASK_ID // SLURM_ARRAY_TASK_ID
 # req: INPUT
@@ -14,8 +11,8 @@
 cwd=$PWD
 export TEMPDIR=${TEMPDIR-/tmp}
 export WORK_DIR=${WORK_DIR-$TEMPDIR/build_3d}
-export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.4.2}
-export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.1}
+export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.5.1}
+export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.2}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
 export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
 export PYTHONBASE=$WORK_DIR/$PYENV_VERSION
@@ -90,8 +87,8 @@ fi
 if ! [ -f $WORK_DIR/jchem-19.15/.done ]; then
         synchronize_all_but_first "extracting_jchem" "cp $HOME/soft/jchem-19.15.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf jchem-19.15.tar.gz && echo > jchem-19.15/.done && popd"
 fi
-if ! [ -f $WORK_DIR/corina-2022/.done ]; then
-	synchronize_all_but_first "extracting_corina" "cp $HOME/soft/corina.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf corina.tar.gz && echo > corina-2022/.done && popd"
+if ! [ -f $WORK_DIR/corina/.done ]; then
+	synchronize_all_but_first "extracting_corina" "cp $HOME/soft/corina.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf corina.tar.gz && echo > corina/.done && popd"
 fi
 
 function log {
@@ -101,7 +98,7 @@ function log {
 log $(hostname)
 
 WORK_BASE=$WORK_DIR/${JOB_ID}_${TASK_ID}.build-3d.d
-mkcd $WORK_BASE
+mkdir -p $WORK_BASE
 
 if [ -z $RESUBMIT ]; then
 	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$TASK_ID`
@@ -130,11 +127,13 @@ cleanup() {
 # save our progress if we've reached the time limit. DOCK has not been modified to take advantage of this, so this doesn't do much as of yet
 # but this will be useful for re-doing as little work as possible in the future
 reached_time_limit() {
+	pushd $WORK_BASE
         log "time limit reached! saving progress..."
         tar -czf $(basename $TARGET_FILE).save.tar.gz .
         mkdir -p $OUTPUT/save
         mv $(basename $TARGET_FILE).save.tar.gz $OUTPUT/save
-        cleanup
+        popd $WORK_BASE
+	cleanup
 }
 
 # on sge, SIGUSR1 is sent once a job surpasses it's "soft" time limit (-l s_rt=XX:XX:XX), usually specified a minute or two before the hard time limit (-l h_rt=XX:XX:XX) where SIGTERM is sent
@@ -149,8 +148,11 @@ fi
 
 # un-archive our saved progress (if any) into the current working directory
 if [ -f $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz ]; then
-        tar -xzf $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz
+        echo "saved progress found!"
+	tar -xzf $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz .
         rm $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz
+	pwd
+	ls -l
 fi
 
 source $cwd/env_new_lig_build.sh
