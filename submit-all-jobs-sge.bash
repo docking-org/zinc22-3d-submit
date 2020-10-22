@@ -26,6 +26,8 @@ MAX_PARALLEL=${MAX_PARALLEL-5000}
 LINES_PER_BATCH=${LINES_PER_BATCH-20000}
 LINES_PER_JOB=${LINES_PER_JOB-50}
 JOBS_PER_BATCH=$((LINES_PER_BATCH/LINES_PER_JOB))
+BATCH_RESUBMIT_THRESHOLD=${BATCH_RESUBMIT_THRESHOLD-80}
+BUILD_DIR=${build_3d-$BUILD_DIR}
 
 log MAX_PARALLEL=$MAX_PARALLEL
 log MAX_BATCHES=$MAX_BATCHES
@@ -65,19 +67,29 @@ for batch_50K in $OUTPUT_DEST/in/*; do
         split --suffix-length=3 --lines=$LINES_PER_JOB $batch_50K $INPUT/
     fi
 
-    n_submit=$(ls -l $INPUT | tail -n+2 | grep -v "^d" | wc -l)
+    # it tends to be faster (if supported) to use du -s --inodes to count entries, as ls | wc -l can be slow
+    n_submit=$(du -s --inodes $INPUT | awk '{print $1}')
+    if [ -d $INPUT/resubmit ]; then
+        n_resubmit=$(du -s --inodes $INPUT/resubmit | awk '{print $1}')
+        n_submit=$((n_submit-n_resubmit-1)) # -1 because du counts the directory iteslf for no. of inodes
+    fi
 
     if [ -d $OUTPUT ]; then
-        n_present=$(ls $OUTPUT | wc -l)
-	    if [ $((n_submit-n_present)) -lt $(((5 * n_submit)/100)) ]; then
-		log "this batch looks mostly done, ($((n_submit-n_present)))moving on..."
+        #n_present=$(ls $OUTPUT | wc -l)
+        n_present=$(du -s --inodes $OUTPUT | awk '{print $1}')
+        if [ -d $OUTPUT/save ]; then
+                n_save=$(du -s --inodes $OUTPUT/save | awk '{print $1}')
+                n_present=$((n_present-n_save-1)) # -1 -1 because du counts the directory iteslf for no. of inodes
+        fi
+        if [ $((n_submit-n_present)) -lt $(((BATCH_RESUBMIT_THRESHOLD * n_submit)/100)) ]; then
+                log "this batch looks mostly done: ($((n_submit-n_present))) missing... moving on!"
                 continue
         fi
 
         export RESUBMIT=TRUE
         log "checking existing output..."
         all_input=$(ls -l $INPUT | tail -n+2 | grep -v "^d" | awk '{print $9}')
-        present=$(ls $OUTPUT | cut -d'.' -f1 | sort -n)
+        present=$(ls -l $OUTPUT | tail -n+2 | grep -v "^d" | awk '{print $9}' | cut -d'.' -f1 | sort -n)
         all=$(seq 1 $n_submit)
         missing=$(printf "$present\n$all\n" | sort -n | uniq -u)
 
@@ -99,11 +111,12 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 
     QSUB_ARGS=${QSUB_ARGS-"-l s_rt=01:58:00 -l h_rt=02:00:00"}
     # very annoying having to export environment variables like this
-    qsub $QSUB_ARGS -o $TEMPDIR -e $TEMPDIR -v TEMPDIR=$TEMPDIR -v WORK_DIR=$WORK_DIR -v RESUBMIT=$RESUBMIT -v OUTPUT=$OUTPUT -v LOGGING=$LOGGING -v INPUT=$INPUT -N batch_3d -t 1-$n_submit 'build-3d.bash'
+    qsub $QSUB_ARGS -cwd -o $TEMPDIR -e $TEMPDIR -v BUILD_DIR=$BUILD_DIR -v TEMPDIR=$TEMPDIR -v RESUBMIT=$RESUBMIT -v OUTPUT=$OUTPUT -v LOGGING=$LOGGING -v INPUT=$INPUT -N batch_3d -t 1-$n_submit 'build-3d.bash'
     log "submitted batch"
 
+    n_uniq=0
     once=true
-    while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $((MAX_PARALLEL/500)) ] || ! [ -z $once ]; do
+    while [ $n_uniq -ge $MAX_BATCHES ] || ! [ -z $once ]; do
         [ -z $once ] && sleep 120
         n_uniq=`qstat | tail -n+3 | grep batch_3d | awk '{print $1}' | sort -u | wc -l`
         n_jobs=`qstat | tail -n+3 | grep batch_3d | wc -l`

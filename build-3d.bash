@@ -9,8 +9,9 @@
 # opt: WORK_DIR
 
 cwd=$PWD
+export BUILD_DIR=${BUILD_DIR-build_3d}
 export TEMPDIR=${TEMPDIR-/tmp}
-export WORK_DIR=${WORK_DIR-$TEMPDIR/build_3d}
+export WORK_DIR=$TEMPDIR/$BUILD_DIR
 export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.5.1}
 export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.2}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
@@ -121,7 +122,7 @@ cleanup() {
         mv $ERROR_LOG $LOGGING/$(basename $TARGET_FILE).err
         mv $OUTPUT_LOG $LOGGING/$(basename $TARGET_FILE).out
         if [ -z $SKIP_DELETE ] && [ -d $WORK_BASE ]; then rm -r $WORK_BASE; fi
-        exit
+        exit $1
 }
 
 # save our progress if we've reached the time limit. DOCK has not been modified to take advantage of this, so this doesn't do much as of yet
@@ -133,7 +134,7 @@ reached_time_limit() {
         mkdir -p $OUTPUT/save
         mv $(basename $TARGET_FILE).save.tar.gz $OUTPUT/save
         popd $WORK_BASE
-	cleanup
+	cleanup 99
 }
 
 # on sge, SIGUSR1 is sent once a job surpasses it's "soft" time limit (-l s_rt=XX:XX:XX), usually specified a minute or two before the hard time limit (-l h_rt=XX:XX:XX) where SIGTERM is sent
@@ -143,7 +144,7 @@ trap reached_time_limit SIGUSR1
 # jobs that have output already shouldn't be resubmitted, but this is just in case that doesn't happen
 if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
         log "results already present in $OUTPUT_BASE for this job, exiting..."
-        cleanup
+        cleanup 0
 fi
 
 # un-archive our saved progress (if any) into the current working directory
@@ -151,8 +152,6 @@ if [ -f $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz ]; then
         echo "saved progress found!"
 	tar -xzf $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz .
         rm $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz
-	pwd
-	ls -l
 fi
 
 source $cwd/env_new_lig_build.sh
@@ -163,4 +162,4 @@ ${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME -H 7.4 --no-db $(basename $TARGET_
 
 log "finished build job on $TARGET_FILE"
 mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
-cleanup
+cleanup 0
