@@ -9,8 +9,9 @@
 # opt: WORK_DIR
 
 cwd=$PWD
+export BUILD_DIR=${BUILD_DIR-build_3d}
 export TEMPDIR=${TEMPDIR-/tmp}
-export WORK_DIR=${WORK_DIR-$TEMPDIR/build_3d}
+export WORK_DIR=$TEMPDIR/$BUILD_DIR
 export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.5.1}
 export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.2}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
@@ -133,7 +134,7 @@ reached_time_limit() {
         mkdir -p $OUTPUT/save
         mv $(basename $TARGET_FILE).save.tar.gz $OUTPUT/save
         popd $WORK_BASE
-	cleanup 1
+	cleanup 99
 }
 
 # on sge, SIGUSR1 is sent once a job surpasses it's "soft" time limit (-l s_rt=XX:XX:XX), usually specified a minute or two before the hard time limit (-l h_rt=XX:XX:XX) where SIGTERM is sent
@@ -151,8 +152,6 @@ if [ -f $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz ]; then
         echo "saved progress found!"
 	tar -xzf $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz .
         rm $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz
-	pwd
-	ls -l
 fi
 
 source $cwd/env_new_lig_build.sh
