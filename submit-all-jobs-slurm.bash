@@ -110,7 +110,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     mkdir -p $LOGGING
 
     SBATCH_ARGS=${SBATCH_ARGS-"--time=02:00:00"}
-    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $SCRATCH/batch_3d_%A_%a.out -e $SCRATCH/batch_3d_%A_%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
+    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $TEMPDIR/batch_3d_%A_%a.out -e $TEMPDIR/batch_3d_%A_%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
     log "submitted batch with job_id=$job_id"
 
     once=true
@@ -120,7 +120,8 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 	    n_jobs=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | wc -l`
         n_jobs=$((n_jobs-n_uniq))
         log "$n_uniq batches submitted, $n_jobs jobs running"
-    done
+	once=
+    done 
 
     log n_jobs=$n_jobs
 
