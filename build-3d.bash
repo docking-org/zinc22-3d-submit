@@ -12,8 +12,8 @@ cwd=$PWD
 export BUILD_DIR=${BUILD_DIR-build_3d}
 export TEMPDIR=${TEMPDIR-/tmp}
 export WORK_DIR=$TEMPDIR/$BUILD_DIR
-export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.5.1}
-export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.2}
+export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.5.2}
+export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.3}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
 export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
 export PYTHONBASE=$WORK_DIR/$PYENV_VERSION
@@ -51,7 +51,8 @@ function synchronize_all_but_first {
 }
 
 # any jobs that were cancelled previously should be cleaned up
-old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +180 -name '*.build-3d.d')
+old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -type d -mmin +180 -name '*.build-3d.d')
+old_logs=$(find $TEMPDIR -mindepth 1 -maxdepth 1 -type f -mmin +180 -name 'batch_3d*')
 
 # to properly synchronize work done by multiple threads we need to do a couple things
 # 1. we need a long-term flag to mark the work as completed/not completed
@@ -64,7 +65,10 @@ old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +180 -name '*.build-3d.d
 #       with it's work. In this case, we need to have a temporary "done" flag for the first thread to signal the
 #       other waiting threads that it's okay to move on, which is what I do in the synchronize_all_but_first function
 
-if [ $(echo "$old_work" | wc -l) -gt 1 ]; then
+if [ $(printf "$old_logs" | wc -l ) -gt 0 ]; then
+	synchronize_all_but_first "removing_old_logs" "find $TEMPDIR -type f -mindepth 1 -maxdepth 1 -mmin +180 -name 'batch_3d*' | xargs rm -r"
+fi
+if [ $(printf "$old_work" | wc -l) -gt 0 ]; then
         synchronize_all_but_first "removing_old_work" "find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +120 -name '*.build-3d.d' | xargs rm -r"
 fi
 if [ -d $WORK_DIR/$OLD_PYENV_VERSION ]; then
@@ -116,6 +120,7 @@ cd $WORK_BASE
 log $(hostname)
 log "starting build job on $TARGET_FILE"
 log "len($TARGET_FILE)=$(cat $TARGET_FILE | wc -l)"
+log "RESTARTED=$RESTARTED, SLURM_RESTART_COUNT=$SLURM_RESTART_COUNT"
 
 # move logs to their final destination & clean up the working directory
 cleanup() {
@@ -139,7 +144,12 @@ reached_time_limit() {
 
 # on sge, SIGUSR1 is sent once a job surpasses it's "soft" time limit (-l s_rt=XX:XX:XX), usually specified a minute or two before the hard time limit (-l h_rt=XX:XX:XX) where SIGTERM is sent
 # on slurm, the same can be achieved by adding the --signal=USR1@60 option to your sbatch args to send the SIGUSR1 signal 1 minute before the job is terminated
-trap reached_time_limit SIGUSR1
+donothing() {
+	printf "received SIGUSR1: build-3d.bash"
+}
+
+#set -m
+trap '' SIGUSR1
 
 # jobs that have output already shouldn't be resubmitted, but this is just in case that doesn't happen
 if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
@@ -158,7 +168,20 @@ source $cwd/env_new_lig_build.sh
 export DEBUG=TRUE
 # this env variable used for debugging old versions only
 MAIN_SCRIPT_NAME=${MAIN_SCRIPT_NAME-build_database_ligand_strain_noH_btingle.sh}
-${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME -H 7.4 --no-db $(basename $TARGET_FILE)
+bash ${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME -H 7.4 --no-db $(basename $TARGET_FILE) &
+pid=$!
+while kill -0 $pid > /dev/null 2>&1
+do
+	wait $pid
+	ret=$?
+done
+#ret=$?
+
+echo "ret=$ret"
+
+if [ $ret -eq 10 ]; then
+	reached_time_limit
+fi
 
 log "finished build job on $TARGET_FILE"
 mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
