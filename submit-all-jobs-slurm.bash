@@ -8,7 +8,6 @@
 # opt: LINES_PER_BATCH
 # opt: LINES_PER_JOB
 # opt: QSUB_ARGS
-# opt: TEMPDIR
 
 function log {
     echo "[submit-all $(date +%X)]: " $@
@@ -20,25 +19,42 @@ function mkd {
     fi
 }
 
-TEMPDIR=${TEMPDIR-/tmp}
-MAX_BATCHES=${MAX_BATCHES-20}
-MAX_PARALLEL=${MAX_PARALLEL-5000}
-LINES_PER_BATCH=${LINES_PER_BATCH-20000}
-LINES_PER_JOB=${LINES_PER_JOB-50}
-JOBS_PER_BATCH=$((LINES_PER_BATCH/LINES_PER_JOB))
-# what % of the batch should be done before it is considered complete and not eligible for re-submission
-BATCH_RESUBMIT_THRESHOLD=${BATCH_RESUBMIT_THRESHOLD-20}
+function exists {
+	env_name=$1
+	desc=$2
+	if [ -z "${!env_name}" ]; then
+		echo "expected env arg: $env_name"
+		echo "arg description: $desc" 
+		failed=1
+	fi
+}
 
-log MAX_PARALLEL=$MAX_PARALLEL
-log MAX_BATCHES=$MAX_BATCHES
+function exists_warning {
+	env_name=$1
+	desc=$2
+	default=$3
+	if [ -z "${!env_name}" ]; then
+		echo "optional env arg missing: $env_name"
+		echo "arg description: $desc"
+		echo "defaulting to $default"
+		export $env_name="$default"
+	fi
+}
+
+exists INPUT_FILE "input SMILES for 3d building"
+exists OUTPUT_DEST "base destination for db2, logs, split input files"
+exists_warning SHRTCACHE "short term storage for working files" /dev/shm
+exists_warning LONGCACHE "long term storage for program files" /tmp
+exists_warning MAX_BATCHES "max no. of job arrays submitted at one time"
+exists_warning LINES_PER_BATCH "number of SMILES per job array batch" 50000
+exists_warning LINES_PER_JOB "number of SMILES per job array element" 50
+exists_warning BATCH_RESUBMIT_THRESHOLD "minimum percentage of entries in an array batch that are complete before batch is considered complete" 80
+JOBS_PER_BATCH=$((LINES_PER_BATCH/LINES_PER_JOB))
+
+[ $failed -eq 1 ] && exit
 
 export INPUT_FILENAME=$(basename $INPUT_FILE)
 export OUTPUT_DEST=$OUTPUT_DEST/$INPUT_FILENAME.batch-3d.d
-
-if ! [ -z $WIPE_ALL ]; then
-    log "wiping all previous files before running..."
-    rm -r $OUTPUT_DEST/*
-fi
 
 mkd $OUTPUT_DEST/in
 mkd $OUTPUT_DEST/out
@@ -109,8 +125,14 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     mkdir -p $OUTPUT
     mkdir -p $LOGGING
 
+    for var in RESUBMIT OUTPUT INPUT LOGGING SHRTCACHE LONGCACHE; do
+	    [ -z "$var_args" ] && var_args="-v $var=${!var}" || var_args="$var_args -v $var=${!var}"
+    done
+
+    echo $var_args
+
     SBATCH_ARGS=${SBATCH_ARGS-"--time=02:00:00"}
-    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $TEMPDIR/batch_3d_%A_%a.out -e $TEMPDIR/batch_3d_%A_%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
+    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $SHRTCACHE/batch_3d_%A_%a.out -e $SHRTCACHE/batch_3d_%A_%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
     log "submitted batch with job_id=$job_id"
 
     once=true

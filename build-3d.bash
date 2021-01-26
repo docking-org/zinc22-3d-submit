@@ -5,19 +5,35 @@
 # req: INPUT
 # req: OUTPUT
 # req: LOGGING
+# req: SHRTCACHE
+# req: LONGCACHE
 
 # opt: WORK_DIR
 
 cwd=$PWD
-export BUILD_DIR=${BUILD_DIR-build_3d}
-export TEMPDIR=${TEMPDIR-/tmp}
-export WORK_DIR=$TEMPDIR/$BUILD_DIR
+export BUILD_DIR=3dbuild_$(whoami)
+export SHRTCACHE=/dev/shm
+export LONGCACHE=/tmp
+export WORK_DIR=$SHRTCACHE/$BUILD_DIR
 export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.5.1}
 export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.2}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
 export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
-export PYTHONBASE=$WORK_DIR/$PYENV_VERSION
-export DOCKBASE=$WORK_DIR/${DOCK_VERSION}
+export COMMON_DIR=$LONGCACHE/build_3d_common
+export PYTHONBASE=$COMMON_DIR/$PYENV_VERSION
+export DOCKBASE=$COMMON_DIR/${DOCK_VERSION}
+
+if ! [ -d $COMMON_DIR ]; then
+        mkdir -p $COMMON_DIR
+        chmod 777 $COMMON_DIR
+fi
+
+# wipe out legacy directories if they're here
+if   [ -d $TEMPDIR/build_3d_$(whoami) ]; then
+        rm -r $TEMPDIR/build_3d_$(whoami)
+elif [ -d $TEMPDIR/build_3d ]; then
+        rm -r $TEMPDIR/build_3d
+fi
 
 JOB_ID=${SLURM_ARRAY_JOB_ID-$JOB_ID}
 TASK_ID=${SLURM_ARRAY_TASK_ID-$SGE_TASK_ID}
@@ -43,9 +59,10 @@ function synchronize_all_but_first {
         flock -w 0 /tmp/${1}.lock -c "printf ${1} && ${@:2} && echo > /tmp/${1}.done" && FIRST=TRUE
         if [ -z $FIRST ]; then
                 printf "waiting ${1}"
-                while ! [ -f /tmp/${1}.done ]; do sleep 1; printf "."; done
+                n=0
+                while ! [ -f /tmp/${1}.done ]; do sleep 0.1; n=$((n+1)); if [ $n -eq 10 ]; then printf "."; n=0; fi; done
         else
-                sleep 5 && rm /tmp/${1}.done
+                sleep 1 && rm /tmp/${1}.done
         fi
 	echo
 }
@@ -67,29 +84,29 @@ old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +180 -name '*.build-3d.d
 if [ $(echo "$old_work" | wc -l) -gt 1 ]; then
         synchronize_all_but_first "removing_old_work" "find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +120 -name '*.build-3d.d' | xargs rm -r"
 fi
-if [ -d $WORK_DIR/$OLD_PYENV_VERSION ]; then
-        synchronize_all_but_first "removing_old_pyenv" "rm -r $WORK_DIR/$OLD_PYENV_VERSION"
+if [ -d $COMMON_DIR/$OLD_PYENV_VERSION ]; then
+        synchronize_all_but_first "removing_old_pyenv" "rm -r $COMMON_DIR/$OLD_PYENV_VERSION"
 fi
-if [ -d $WORK_DIR/$OLD_DOCK_VERSION ]; then
-        synchronize_all_but_first "removing_old_dock" "rm -r $WORK_DIR/$OLD_DOCK_VERSION"
+if [ -d $COMMON_DIR/$OLD_DOCK_VERSION ]; then
+        synchronize_all_but_first "removing_old_dock" "rm -r $COMMON_DIR/$OLD_DOCK_VERSION"
 fi
 if ! [ -f $DOCKBASE/.done ]; then
-        synchronize_all_but_first "extracting_dock" "cp $HOME/soft/$DOCK_VERSION.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf $DOCK_VERSION.tar.gz && echo > $DOCK_VERSION/.done && popd"
+        synchronize_all_but_first "extracting_dock" "cp $HOME/soft/$DOCK_VERSION.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf $DOCK_VERSION.tar.gz && echo > $DOCK_VERSION/.done && popd"
 fi
 if ! [ -f $PYTHONBASE/.done ]; then
-        synchronize_all_but_first "extracting_pyenv" "cp $HOME/soft/$PYENV_VERSION.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf $PYENV_VERSION.tar.gz && echo > $PYENV_VERSION/.done && popd"
+        synchronize_all_but_first "extracting_pyenv" "cp $HOME/soft/$PYENV_VERSION.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf $PYENV_VERSION.tar.gz && echo > $PYENV_VERSION/.done && popd"
 fi
-if ! [ -f $WORK_DIR/lib/.done ]; then
-	synchronize_all_but_first "extracting_libs" "cp $HOME/soft/lib.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf lib.tar.gz && echo > lib/.done && popd"
+if ! [ -f $COMMON_DIR/lib/.done ]; then
+	synchronize_all_but_first "extracting_libs" "cp $HOME/soft/lib.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf lib.tar.gz && echo > lib/.done && popd"
 fi
-if ! [ -f $WORK_DIR/openbabel-install/.done ]; then
-	synchronize_all_but_first "extracting_obabel" "cp $HOME/soft/openbabel-install.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf openbabel-install.tar.gz && echo > openbabel-install/.done && popd"
+if ! [ -f $COMMON_DIR/openbabel-install/.done ]; then
+	synchronize_all_but_first "extracting_obabel" "cp $HOME/soft/openbabel-install.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf openbabel-install.tar.gz && echo > openbabel-install/.done && popd"
 fi
-if ! [ -f $WORK_DIR/jchem-19.15/.done ]; then
-        synchronize_all_but_first "extracting_jchem" "cp $HOME/soft/jchem-19.15.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf jchem-19.15.tar.gz && echo > jchem-19.15/.done && popd"
+if ! [ -f $COMMON_DIR/jchem-19.15/.done ]; then
+        synchronize_all_but_first "extracting_jchem" "cp $HOME/soft/jchem-19.15.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf jchem-19.15.tar.gz && echo > jchem-19.15/.done && popd"
 fi
-if ! [ -f $WORK_DIR/corina/.done ]; then
-	synchronize_all_but_first "extracting_corina" "cp $HOME/soft/corina.tar.gz $WORK_DIR && pushd $WORK_DIR && time tar -xzf corina.tar.gz && echo > corina/.done && popd"
+if ! [ -f $COMMON_DIR/corina/.done ]; then
+	synchronize_all_but_first "extracting_corina" "cp $HOME/soft/corina.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf corina.tar.gz && echo > corina/.done && popd"
 fi
 
 function log {
@@ -139,7 +156,7 @@ reached_time_limit() {
 
 # on sge, SIGUSR1 is sent once a job surpasses it's "soft" time limit (-l s_rt=XX:XX:XX), usually specified a minute or two before the hard time limit (-l h_rt=XX:XX:XX) where SIGTERM is sent
 # on slurm, the same can be achieved by adding the --signal=USR1@60 option to your sbatch args to send the SIGUSR1 signal 1 minute before the job is terminated
-trap reached_time_limit SIGUSR1
+# trap reached_time_limit SIGUSR1
 
 # jobs that have output already shouldn't be resubmitted, but this is just in case that doesn't happen
 if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
@@ -154,12 +171,77 @@ if [ -f $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz ]; then
         rm $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz
 fi
 
-source $cwd/env_new_lig_build.sh
+##### start initialize environment. Moving this from env_new_lig_build.sh to here so everything fits in one file
+
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$COMMON_DIR/lib
+
+#export AMSOLEXE=$SOFTBASE/amsol/in-house/amsol7.1-colinear-fix/amsol7.1
+
+# Experimental changes to DOCK ligand pipeline
+export EMBED_PROTOMERS_3D_EXE=$DOCKBASE/ligand/3D/embed3d_corina.sh
+# parameters related to omega
+# set omega energy window, if it equals 0, rotatable-bond-dependent window method.
+export OMEGA_ENERGY_WINDOW=12
+# set omega max number of confs, if it equals 0, rotatable-bond-dependent window method.
+export OMEGA_MAX_CONFS=600
+# set the omega torsion library: 1) Original; 2) GubaV21
+export OMEGA_TORLIB=Original
+# set the omega force field. Options are in the link below
+# https://docs.eyesopen.com/toolkits/cpp/oefftk/OEFFConstants/OEMMFFSheffieldFFType.html#OEFF::OEMMFFSheffieldFFType::MMFF94Smod
+export OMEGA_FF=MMFF94Smod
+# set the omega rmsd for clustering and filtering conformations, if it equals 0, rotatable-bond-dependent window method.
+export OMEGA_RMSD=0.5
+
+# Dependencies
+
+# CORINA env.sh on wynton has an incorrect path specified
+export PATH="$COMMON_DIR/corina:${PATH}"
+
+# so does openbabel
+export OBABELBASE=$COMMON_DIR/openbabel-install
+export BABEL_LIBDIR=$COMMON_DIR/lib/openbabel/2.3.1
+export BABEL_DATADIR=$COMMON_DIR/openbabel-install/share/openbabel/2.3.1
+export PATH="${PATH}:${OBABELBASE}/bin"
+
+# aaand jchem too. all the software
+# activate the openeye license
+export OE_LICENSE=$HOME/.oe-license.txt
+export CHEMAXON_PATH=$COMMON_DIR/jchem-19.15
+export CHEMAXON_LICENSE_URL=$HOME/.jchem-license.cxl
+export PATH="$PATH:$CHEMAXON_PATH/bin"
+
+LIMIT_JAVA="${DOCKBASE}/common/java-thread-limiter/mock-num-cpus 2"
+export CXCALCEXE="`which cxcalc `"
+export MOLCONVERTEXE="`which molconvert`"
+export PATH="${PATH}:${DOCKBASE}/bin"
+
+# activate python environment
+source $PYTHONBASE/bin/activate
+
+##### end initialize environment 
+
+#source $cwd/env_new_lig_build.sh
 export DEBUG=TRUE
 # this env variable used for debugging old versions only
 MAIN_SCRIPT_NAME=${MAIN_SCRIPT_NAME-build_database_ligand_strain_noH_btingle.sh}
-${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME -H 7.4 --no-db $(basename $TARGET_FILE)
+${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME -H 7.4 --no-db $(basename $TARGET_FILE) &
+genpid=$!
+
+function signal_generate_ligands {
+        received_sigusr=TRUE
+        kill -10 $genpid
+}
+trap signal_generate_ligands SIGUSR1
+
+while [ -z "$(kill -0 $genpid 2>&1)" ]; do
+	sleep 5
+done
+
+if ! [ -z $received_sigusr ]; then
+        reached_time_limit
+fi
 
 log "finished build job on $TARGET_FILE"
+
 mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
 cleanup 0
