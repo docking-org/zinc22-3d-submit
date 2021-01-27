@@ -12,11 +12,11 @@
 
 cwd=$PWD
 export BUILD_DIR=3dbuild_$(whoami)
-export SHRTCACHE=/dev/shm
-export LONGCACHE=/tmp
+export SHRTCACHE=${SHRTCACHE-/dev/shm}
+export LONGCACHE=${LONGCACHE-/tmp}
 export WORK_DIR=$SHRTCACHE/$BUILD_DIR
-export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.5.1}
-export DOCK_VERSION=${DOCK_VERSION-DOCK.2.5.2}
+export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.5.2}
+export DOCK_VERSION=${DOCK_VERSION-DOCK.3.8.0.3d}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
 export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
 export COMMON_DIR=$LONGCACHE/build_3d_common
@@ -29,11 +29,11 @@ if ! [ -d $COMMON_DIR ]; then
 fi
 
 # wipe out legacy directories if they're here
-if   [ -d $TEMPDIR/build_3d_$(whoami) ]; then
-        rm -r $TEMPDIR/build_3d_$(whoami)
-elif [ -d $TEMPDIR/build_3d ]; then
-        rm -r $TEMPDIR/build_3d
-fi
+#if   [ -d $TEMPDIR/build_3d_$(whoami) ]; then
+#        rm -r $TEMPDIR/build_3d_$(whoami)
+#elif [ -d $TEMPDIR/build_3d ]; then
+#        rm -r $TEMPDIR/build_3d
+#fi
 
 JOB_ID=${SLURM_ARRAY_JOB_ID-$JOB_ID}
 TASK_ID=${SLURM_ARRAY_TASK_ID-$SGE_TASK_ID}
@@ -81,6 +81,10 @@ old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +180 -name '*.build-3d.d
 #       with it's work. In this case, we need to have a temporary "done" flag for the first thread to signal the
 #       other waiting threads that it's okay to move on, which is what I do in the synchronize_all_but_first function
 
+function extract_cmd {
+	echo "tar -C $COMMON_DIR -xzf ~/soft/$1.tar.gz && echo > $COMMON_DIR/$1/.done"
+}
+
 if [ $(echo "$old_work" | wc -l) -gt 1 ]; then
         synchronize_all_but_first "removing_old_work" "find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +120 -name '*.build-3d.d' | xargs rm -r"
 fi
@@ -91,22 +95,22 @@ if [ -d $COMMON_DIR/$OLD_DOCK_VERSION ]; then
         synchronize_all_but_first "removing_old_dock" "rm -r $COMMON_DIR/$OLD_DOCK_VERSION"
 fi
 if ! [ -f $DOCKBASE/.done ]; then
-        synchronize_all_but_first "extracting_dock" "cp $HOME/soft/$DOCK_VERSION.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf $DOCK_VERSION.tar.gz && echo > $DOCK_VERSION/.done && popd"
+        synchronize_all_but_first "extracting_dock" "$(extract_cmd $DOCK_VERSION)"
 fi
 if ! [ -f $PYTHONBASE/.done ]; then
-        synchronize_all_but_first "extracting_pyenv" "cp $HOME/soft/$PYENV_VERSION.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf $PYENV_VERSION.tar.gz && echo > $PYENV_VERSION/.done && popd"
+        synchronize_all_but_first "extracting_pyenv" "$(extract_cmd $PYENV_VERSION)"
 fi
 if ! [ -f $COMMON_DIR/lib/.done ]; then
-	synchronize_all_but_first "extracting_libs" "cp $HOME/soft/lib.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf lib.tar.gz && echo > lib/.done && popd"
+	synchronize_all_but_first "extracting_libs" "$(extract_cmd lib)"
 fi
 if ! [ -f $COMMON_DIR/openbabel-install/.done ]; then
-	synchronize_all_but_first "extracting_obabel" "cp $HOME/soft/openbabel-install.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf openbabel-install.tar.gz && echo > openbabel-install/.done && popd"
+	synchronize_all_but_first "extracting_obabel" "$(extract_cmd openbabel-install)"
 fi
 if ! [ -f $COMMON_DIR/jchem-19.15/.done ]; then
-        synchronize_all_but_first "extracting_jchem" "cp $HOME/soft/jchem-19.15.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf jchem-19.15.tar.gz && echo > jchem-19.15/.done && popd"
+        synchronize_all_but_first "extracting_jchem" "$(extract_cmd jchem-19.15)"
 fi
 if ! [ -f $COMMON_DIR/corina/.done ]; then
-	synchronize_all_but_first "extracting_corina" "cp $HOME/soft/corina.tar.gz $COMMON_DIR && pushd $COMMON_DIR && time tar -xzf corina.tar.gz && echo > corina/.done && popd"
+	synchronize_all_but_first "extracting_corina" "$(extract_cmd corina)"
 fi
 
 function log {

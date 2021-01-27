@@ -41,11 +41,12 @@ function exists_warning {
 	fi
 }
 
+failed=0
 exists INPUT_FILE "input SMILES for 3d building"
 exists OUTPUT_DEST "base destination for db2, logs, split input files"
 exists_warning SHRTCACHE "short term storage for working files" /dev/shm
 exists_warning LONGCACHE "long term storage for program files" /tmp
-exists_warning MAX_BATCHES "max no. of job arrays submitted at one time"
+exists_warning MAX_BATCHES "max no. of job arrays submitted at one time" 25
 exists_warning LINES_PER_BATCH "number of SMILES per job array batch" 50000
 exists_warning LINES_PER_JOB "number of SMILES per job array element" 50
 exists_warning BATCH_RESUBMIT_THRESHOLD "minimum percentage of entries in an array batch that are complete before batch is considered complete" 80
@@ -129,14 +130,14 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 	    [ -z "$var_args" ] && var_args="-v $var=${!var}" || var_args="$var_args -v $var=${!var}"
     done
 
-    echo $var_args
+    #echo $var_args
 
     SBATCH_ARGS=${SBATCH_ARGS-"--time=02:00:00"}
     job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $SHRTCACHE/batch_3d_%A_%a.out -e $SHRTCACHE/batch_3d_%A_%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
     log "submitted batch with job_id=$job_id"
 
     once=true
-    while [ "$n_jobs" -ge $MAX_PARALLEL ] || [ "$n_uniq" -ge $MAX_BATCHES ] || ! [ -z $once ]; do
+    while [ "$n_uniq" -ge $MAX_BATCHES ] || ! [ -z $once ]; do
         [ -z $once ] && sleep 120
 	    n_uniq=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | awk '{print $1}' | cut -d'_' -f1 | sort -u | wc -l`
 	    n_jobs=`squeue -u $(whoami) | tail -n+2 | grep batch_3d | wc -l`
