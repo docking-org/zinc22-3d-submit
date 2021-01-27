@@ -43,13 +43,14 @@ function exists_warning {
 
 failed=0
 exists INPUT_FILE "input SMILES for 3d building"
-exists OUTPUT_DEST "base destination for db2, logs, split input files"
+exists OUTPUT_DEST "nfs destination for db2, logs, split input files"
 exists_warning SHRTCACHE "short term storage for working files" /dev/shm
 exists_warning LONGCACHE "long term storage for program files" /tmp
 exists_warning MAX_BATCHES "max no. of job arrays submitted at one time" 25
 exists_warning LINES_PER_BATCH "number of SMILES per job array batch" 50000
 exists_warning LINES_PER_JOB "number of SMILES per job array element" 50
 exists_warning BATCH_RESUBMIT_THRESHOLD "minimum percentage of entries in an array batch that are complete before batch is considered complete" 80
+exists_warning SOFT_HOME "nfs directory where software is stored" $HOME
 JOBS_PER_BATCH=$((LINES_PER_BATCH/LINES_PER_JOB))
 
 [ $failed -eq 1 ] && exit

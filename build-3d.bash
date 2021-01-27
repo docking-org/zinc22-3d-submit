@@ -11,6 +11,7 @@
 # opt: WORK_DIR
 
 cwd=$PWD
+export SOFT_HOME=${SOFT_HOME-$HOME}
 export BUILD_DIR=3dbuild_$(whoami)
 export SHRTCACHE=${SHRTCACHE-/dev/shm}
 export LONGCACHE=${LONGCACHE-/tmp}
@@ -82,7 +83,7 @@ old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +180 -name '*.build-3d.d
 #       other waiting threads that it's okay to move on, which is what I do in the synchronize_all_but_first function
 
 function extract_cmd {
-	echo "tar -C $COMMON_DIR -xzf ~/soft/$1.tar.gz && echo > $COMMON_DIR/$1/.done"
+	echo "tar -C $COMMON_DIR -xzf $SOFT_HOME/soft/$1.tar.gz && echo > $COMMON_DIR/$1/.done"
 }
 
 if [ $(echo "$old_work" | wc -l) -gt 1 ]; then
