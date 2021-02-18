@@ -40,11 +40,11 @@ JOB_ID=${SLURM_ARRAY_JOB_ID-$JOB_ID}
 TASK_ID=${SLURM_ARRAY_TASK_ID-$SGE_TASK_ID}
 
 if [ -z $SLURM_ARRAY_JOB_ID ]; then
-        ERROR_LOG=$TEMPDIR/batch_3d.e${JOB_ID}.${TASK_ID}
-        OUTPUT_LOG=$TEMPDIR/batch_3d.o${JOB_ID}.${TASK_ID}
+        ERROR_LOG=$SHRTCACHE/batch_3d.e${JOB_ID}.${TASK_ID}
+        OUTPUT_LOG=$SHRTCACHE/batch_3d.o${JOB_ID}.${TASK_ID}
 else
-        ERROR_LOG=$TEMPDIR/batch_3d_${JOB_ID}_${TASK_ID}.err
-        OUTPUT_LOG=$TEMPDIR/batch_3d_${JOB_ID}_${TASK_ID}.out
+        ERROR_LOG=$SHRTCACHE/batch_3d_${JOB_ID}_${TASK_ID}.err
+        OUTPUT_LOG=$SHRTCACHE/batch_3d_${JOB_ID}_${TASK_ID}.out
 fi
 
 mkdir -p $WORK_DIR
@@ -57,7 +57,7 @@ function synchronize_all_but_first {
 			return;
 		fi
 	fi # in the case of a particularly short running command, it might be done by the time another job even enters this function
-        flock -w 0 /tmp/${1}.lock -c "printf ${1} && ${@:2} && echo > /tmp/${1}.done" && FIRST=TRUE
+        flock -n /tmp/${1}.lock -c "printf ${1} && ${@:2} && echo > /tmp/${1}.done" && FIRST=TRUE
         if [ -z $FIRST ]; then
                 printf "waiting ${1}"
                 n=0
@@ -70,6 +70,7 @@ function synchronize_all_but_first {
 
 # any jobs that were cancelled previously should be cleaned up
 old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +180 -name '*.build-3d.d')
+old_logs=$(find $SHRTCACHE -mindepth 1 -maxdepth 1 -mmin +180 -name '*batch_3d*.???')
 
 # to properly synchronize work done by multiple threads we need to do a couple things
 # 1. we need a long-term flag to mark the work as completed/not completed
@@ -88,6 +89,9 @@ function extract_cmd {
 
 if [ $(echo "$old_work" | wc -l) -gt 1 ]; then
         synchronize_all_but_first "removing_old_work" "find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +120 -name '*.build-3d.d' | xargs rm -r"
+fi
+if [ $(echo "$old_logs" | wc -l) -gt 1 ]; then
+	synchronize_all_but_first "removing_old_logs" "find $SHRTCACHE -mindepth 1 -maxdepth 1 -mmin +180 -name '*batch_3d*.???' | xargs rm -r"
 fi
 if [ -d $COMMON_DIR/$OLD_PYENV_VERSION ]; then
         synchronize_all_but_first "removing_old_pyenv" "rm -r $COMMON_DIR/$OLD_PYENV_VERSION"
@@ -210,9 +214,9 @@ export PATH="${PATH}:${OBABELBASE}/bin"
 
 # aaand jchem too. all the software
 # activate the openeye license
-export OE_LICENSE=$HOME/.oe-license.txt
+export OE_LICENSE=$SOFT_HOME/.oe-license.txt
 export CHEMAXON_PATH=$COMMON_DIR/jchem-19.15
-export CHEMAXON_LICENSE_URL=$HOME/.jchem-license.cxl
+export CHEMAXON_LICENSE_URL=$SOFT_HOME/.jchem-license.cxl
 export PATH="$PATH:$CHEMAXON_PATH/bin"
 
 LIMIT_JAVA="${DOCKBASE}/common/java-thread-limiter/mock-num-cpus 2"
@@ -226,7 +230,7 @@ source $PYTHONBASE/bin/activate
 ##### end initialize environment 
 
 #source $cwd/env_new_lig_build.sh
-export DEBUG=TRUE
+# export DEBUG=TRUE
 # this env variable used for debugging old versions only
 MAIN_SCRIPT_NAME=${MAIN_SCRIPT_NAME-build_database_ligand_strain_noH_btingle.sh}
 ${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME -H 7.4 --no-db $(basename $TARGET_FILE) &
