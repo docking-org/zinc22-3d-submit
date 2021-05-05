@@ -49,6 +49,7 @@ fi
 
 mkdir -p $WORK_DIR
 
+# deprecated (and jank as hell)
 function synchronize_all_but_first {
         if [ -f /tmp/${1}.done ]; then 
 		if [ $(( (`date +%s` - `stat -L --format %Y /tmp/${1}.done`) > (10) )) ]; then
@@ -57,7 +58,7 @@ function synchronize_all_but_first {
 			return;
 		fi
 	fi # in the case of a particularly short running command, it might be done by the time another job even enters this function
-        flock -n /tmp/${1}.lock -c "printf ${1} && ${@:2} && echo > /tmp/${1}.done" && FIRST=TRUE
+        flock -n /tmp/${1}.lock -c "printf ${1}; ${@:2} || echo command failed; echo > /tmp/${1}.done" && FIRST=TRUE
         if [ -z $FIRST ]; then
                 printf "waiting ${1}"
                 n=0
@@ -69,8 +70,8 @@ function synchronize_all_but_first {
 }
 
 # any jobs that were cancelled previously should be cleaned up
-old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +180 -name '*.build-3d.d')
-old_logs=$(find $SHRTCACHE -mindepth 1 -maxdepth 1 -mmin +180 -name '*batch_3d*.???')
+old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*.build-3d.d' | wc -l)
+old_logs=$(find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*batch_3d*.???' | wc -l)
 
 # to properly synchronize work done by multiple threads we need to do a couple things
 # 1. we need a long-term flag to mark the work as completed/not completed
@@ -84,38 +85,28 @@ old_logs=$(find $SHRTCACHE -mindepth 1 -maxdepth 1 -mmin +180 -name '*batch_3d*.
 #       other waiting threads that it's okay to move on, which is what I do in the synchronize_all_but_first function
 
 function extract_cmd {
-	echo "tar -C $COMMON_DIR -xzf $SOFT_HOME/soft/$1.tar.gz && echo > $COMMON_DIR/$1/.done"
+	tar -C $COMMON_DIR -xzf $SOFT_HOME/soft/$1.tar.gz && echo > $COMMON_DIR/$1/.done
 }
 
-if [ $(echo "$old_work" | wc -l) -gt 1 ]; then
-        synchronize_all_but_first "removing_old_work" "find $WORK_DIR -mindepth 1 -maxdepth 1 -mmin +120 -name '*.build-3d.d' | xargs rm -r"
-fi
-if [ $(echo "$old_logs" | wc -l) -gt 1 ]; then
-	synchronize_all_but_first "removing_old_logs" "find $SHRTCACHE -mindepth 1 -maxdepth 1 -mmin +180 -name '*batch_3d*.???' | xargs rm -r"
-fi
-if [ -d $COMMON_DIR/$OLD_PYENV_VERSION ]; then
-        synchronize_all_but_first "removing_old_pyenv" "rm -r $COMMON_DIR/$OLD_PYENV_VERSION"
-fi
-if [ -d $COMMON_DIR/$OLD_DOCK_VERSION ]; then
-        synchronize_all_but_first "removing_old_dock" "rm -r $COMMON_DIR/$OLD_DOCK_VERSION"
-fi
-if ! [ -f $DOCKBASE/.done ]; then
-        synchronize_all_but_first "extracting_dock" "$(extract_cmd $DOCK_VERSION)"
-fi
-if ! [ -f $PYTHONBASE/.done ]; then
-        synchronize_all_but_first "extracting_pyenv" "$(extract_cmd $PYENV_VERSION)"
-fi
-if ! [ -f $COMMON_DIR/lib/.done ]; then
-	synchronize_all_but_first "extracting_libs" "$(extract_cmd lib)"
-fi
-if ! [ -f $COMMON_DIR/openbabel-install/.done ]; then
-	synchronize_all_but_first "extracting_obabel" "$(extract_cmd openbabel-install)"
-fi
-if ! [ -f $COMMON_DIR/jchem-19.15/.done ]; then
-        synchronize_all_but_first "extracting_jchem" "$(extract_cmd jchem-19.15)"
-fi
-if ! [ -f $COMMON_DIR/corina/.done ]; then
-	synchronize_all_but_first "extracting_corina" "$(extract_cmd corina)"
+# added an additional check to make sure software dir isn't empty, since this seems to have happened before
+for software in $DOCK_VERSION $PYENV_VERSION lib openbabel-install jchem-19.15 corina; do
+	(
+		flock -x 9
+		if ! [ -f $COMMON_DIR/$software/.done ] || [ $(ls $COMMON_DIR/$software | wc -l) -eq 0 ]; then
+			extract_cmd $software
+		fi
+		flock -u 9
+	)9>/dev/shm/3d_install_${software}.lock
+
+done
+
+if [ $old_work -gt 0 ] || [ $old_logs -gt 0 ]; then
+	(
+		flock -x 9
+		find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*batch_3d*.???' | xargs rm -r
+		find $WORK_DIR -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +120 -name '*.build-3d.d' | xargs rm -r
+		flock -u 9
+	)9>/dev/shm/rm_old.lock
 fi
 
 function log {
