@@ -141,7 +141,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 
     QSUB_ARGS=${QSUB_ARGS-"-l s_rt=01:58:00 -l h_rt=02:00:00"}
     # very annoying having to export environment variables like this
-    qsub $QSUB_ARGS -cwd -o $SHRTCACHE -e $SHRTCACHE $var_args -N batch_3d -t 1-$n_submit 'build-3d.bash'
+    qsub $QSUB_ARGS -cwd -o $LOGGING/\$TASK_ID.out -e $LOGGING\$TASK_ID.err $var_args -N batch_3d -t 1-$n_submit 'build-3d.bash'
     log "submitted batch"
 
     n_uniq=0

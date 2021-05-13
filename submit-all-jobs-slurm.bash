@@ -134,7 +134,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     #echo $var_args
 
     SBATCH_ARGS=${SBATCH_ARGS-"--time=02:00:00"}
-    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $SHRTCACHE/batch_3d_%A_%a.out -e $SHRTCACHE/batch_3d_%A_%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
+    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $LOGGING/%a.out -e $LOGGING/%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
     log "submitted batch with job_id=$job_id"
 
     once=true

@@ -39,35 +39,27 @@ fi
 JOB_ID=${SLURM_ARRAY_JOB_ID-$JOB_ID}
 TASK_ID=${SLURM_ARRAY_TASK_ID-$SGE_TASK_ID}
 
-if [ -z $SLURM_ARRAY_JOB_ID ]; then
-        ERROR_LOG=$SHRTCACHE/batch_3d.e${JOB_ID}.${TASK_ID}
-        OUTPUT_LOG=$SHRTCACHE/batch_3d.o${JOB_ID}.${TASK_ID}
-else
-        ERROR_LOG=$SHRTCACHE/batch_3d_${JOB_ID}_${TASK_ID}.err
-        OUTPUT_LOG=$SHRTCACHE/batch_3d_${JOB_ID}_${TASK_ID}.out
-fi
-
 mkdir -p $WORK_DIR
 
 # deprecated (and jank as hell)
-function synchronize_all_but_first {
-        if [ -f /tmp/${1}.done ]; then 
-		if [ $(( (`date +%s` - `stat -L --format %Y /tmp/${1}.done`) > (10) )) ]; then
-			rm /tmp/${1}.done
-		else
-			return;
-		fi
-	fi # in the case of a particularly short running command, it might be done by the time another job even enters this function
-        flock -n /tmp/${1}.lock -c "printf ${1}; ${@:2} || echo command failed; echo > /tmp/${1}.done" && FIRST=TRUE
-        if [ -z $FIRST ]; then
-                printf "waiting ${1}"
-                n=0
-                while ! [ -f /tmp/${1}.done ]; do sleep 0.1; n=$((n+1)); if [ $n -eq 10 ]; then printf "."; n=0; fi; done
-        else
-                sleep 1 && rm /tmp/${1}.done
-        fi
-	echo
-}
+#function synchronize_all_but_first {
+#        if [ -f /tmp/${1}.done ]; then 
+#		if [ $(( (`date +%s` - `stat -L --format %Y /tmp/${1}.done`) > (10) )) ]; then
+#			rm /tmp/${1}.done
+#		else
+#			return;
+#		fi
+#	fi # in the case of a particularly short running command, it might be done by the time another job even enters this function
+#        flock -n /tmp/${1}.lock -c "printf ${1}; ${@:2} || echo command failed; echo > /tmp/${1}.done" && FIRST=TRUE
+#        if [ -z $FIRST ]; then
+#                printf "waiting ${1}"
+#                n=0
+#                while ! [ -f /tmp/${1}.done ]; do sleep 0.1; n=$((n+1)); if [ $n -eq 10 ]; then printf "."; n=0; fi; done
+#        else
+#                sleep 1 && rm /tmp/${1}.done
+#        fi
+#	echo
+#}
 
 # any jobs that were cancelled previously should be cleaned up
 old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*.build-3d.d' | wc -l)
@@ -136,8 +128,8 @@ log "len($TARGET_FILE)=$(cat $TARGET_FILE | wc -l)"
 
 # move logs to their final destination & clean up the working directory
 cleanup() {
-        mv $ERROR_LOG $LOGGING/$(basename $TARGET_FILE).err
-        mv $OUTPUT_LOG $LOGGING/$(basename $TARGET_FILE).out
+        #mv $ERROR_LOG $LOGGING/$(basename $TARGET_FILE).err
+        #mv $OUTPUT_LOG $LOGGING/$(basename $TARGET_FILE).out
         if [ -z $SKIP_DELETE ] && [ -d $WORK_BASE ]; then rm -r $WORK_BASE; fi
         exit $1
 }
