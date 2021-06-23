@@ -17,7 +17,7 @@ export SHRTCACHE=${SHRTCACHE-/dev/shm}
 export LONGCACHE=${LONGCACHE-/tmp}
 export WORK_DIR=$SHRTCACHE/$BUILD_DIR
 export OLD_DOCK_VERSION=${OLD_DOCK_VERSION-DOCK.2.5.2}
-export DOCK_VERSION=${DOCK_VERSION-DOCK.3.8.0.3d}
+export DOCK_VERSION=${DOCK_VERSION-DOCK.3.8.3.2.3d}
 export OLD_PYENV_VERSION=${OLD_PYENV_VERSION-lig_build_py3-3.7}
 export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
 export COMMON_DIR=$LONGCACHE/build_3d_common
@@ -62,8 +62,8 @@ mkdir -p $WORK_DIR
 #}
 
 # any jobs that were cancelled previously should be cleaned up
-old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*.build-3d.d' | wc -l)
-old_logs=$(find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*batch_3d*.???' | wc -l)
+#old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*.build-3d.d' | wc -l)
+#old_logs=$(find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*batch_3d*.???' | wc -l)
 
 # to properly synchronize work done by multiple threads we need to do a couple things
 # 1. we need a long-term flag to mark the work as completed/not completed
@@ -76,30 +76,30 @@ old_logs=$(find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -n
 #       with it's work. In this case, we need to have a temporary "done" flag for the first thread to signal the
 #       other waiting threads that it's okay to move on, which is what I do in the synchronize_all_but_first function
 
-function extract_cmd {
-	tar -C $COMMON_DIR -xzf $SOFT_HOME/soft/$1.tar.gz && echo > $COMMON_DIR/$1/.done
-}
+#function extract_cmd {
+#	tar -C $COMMON_DIR -xzf $SOFT_HOME/soft/$1.tar.gz && echo > $COMMON_DIR/$1/.done
+#}
 
 # added an additional check to make sure software dir isn't empty, since this seems to have happened before
-for software in $DOCK_VERSION $PYENV_VERSION lib openbabel-install jchem-19.15 corina; do
-	(
-		flock -x 9
-		if ! [ -f $COMMON_DIR/$software/.done ] || [ $(ls $COMMON_DIR/$software | wc -l) -eq 0 ]; then
-			extract_cmd $software
-		fi
-		flock -u 9
-	)9>/dev/shm/3d_install_${software}.lock
+#for software in $DOCK_VERSION $PYENV_VERSION lib openbabel-install jchem-19.15 corina; do
+#	(
+#		flock -x 9
+#		if ! [ -f $COMMON_DIR/$software/.done ] || [ $(ls $COMMON_DIR/$software | wc -l) -eq 0 ]; then
+#			extract_cmd $software
+#		fi
+#		flock -u 9
+#	)9>/dev/shm/3d_install_${software}.lock
+#
+#done
 
-done
-
-if [ $old_work -gt 0 ] || [ $old_logs -gt 0 ]; then
-	(
-		flock -x 9
-		find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*batch_3d*.???' | xargs rm -r
-		find $WORK_DIR -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +120 -name '*.build-3d.d' | xargs rm -r
-		flock -u 9
-	)9>/dev/shm/rm_old.lock
-fi
+#if [ $old_work -gt 0 ] || [ $old_logs -gt 0 ]; then
+#	(
+#		flock -x 9
+#		find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*batch_3d*.???' | xargs rm -r
+#		find $WORK_DIR -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +120 -name '*.build-3d.d' | xargs rm -r
+#		flock -u 9
+#	)9>/dev/shm/rm_old.lock
+#fi
 
 function log {
     echo "[build-3d $(date +%X)]: $@"
