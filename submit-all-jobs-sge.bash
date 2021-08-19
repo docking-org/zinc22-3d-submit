@@ -133,7 +133,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     mkdir -p $OUTPUT
     mkdir -p $LOGGING
 
-    for var in RESUBMIT OUTPUT INPUT LOGGING SHRTCACHE LONGCACHE SOFT_HOME; do
+    for var in RESUBMIT OUTPUT INPUT LOGGING SHRTCACHE LONGCACHE SOFT_HOME CORINA_MAX_CONFS; do
 	    [ -z "$var_args" ] && var_args="-v $var=${!var}" || var_args="$var_args -v $var=${!var}"
     done
 
