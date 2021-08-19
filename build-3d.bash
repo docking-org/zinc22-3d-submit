@@ -224,6 +224,7 @@ function signal_generate_ligands {
         kill -10 $genpid
 }
 trap signal_generate_ligands SIGUSR1
+trap signal_generate_ligands SIGINT
 
 while [ -z "$(kill -0 $genpid 2>&1)" ]; do
 	sleep 5
