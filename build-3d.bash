@@ -88,7 +88,7 @@ for software in $DOCK_VERSION $PYENV_VERSION lib openbabel-install jchem-19.15 c
 			extract_cmd $software
 		fi
 		flock -u 9
-	)9>/dev/shm/3d_install_${software}.lock
+	)9>/dev/shm/3d_install_${software}_${USER}.lock
 
 done
 
@@ -98,7 +98,7 @@ if [ $old_work -gt 0 ] || [ $old_logs -gt 0 ]; then
 		find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*batch_3d*.???' | xargs rm -r
 		find $WORK_DIR -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +120 -name '*.build-3d.d' | xargs rm -r
 		flock -u 9
-	)9>/dev/shm/rm_old.lock
+	)9>/dev/shm/rm_old_${USER}.lock
 fi
 
 function log {
