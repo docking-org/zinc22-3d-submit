@@ -9,6 +9,13 @@
 # opt: LINES_PER_JOB
 # opt: QSUB_ARGS
 
+BINDIR=$(dirname $0)
+BINDIR=${BINDIR-.}
+
+if ! [[ "$BINDIR" == /* ]]; then
+	BINDIR=$PWD/$BINDIR
+fi
+
 function log {
     echo "[submit-all $(date +%X)]: " $@
 }
@@ -134,9 +141,10 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     #echo $var_args
 
     SBATCH_ARGS=${SBATCH_ARGS-"--time=02:00:00"}
-    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $LOGGING/%a.out -e $LOGGING/%a.err --array=1-$n_submit -J batch_3d 'build-3d.bash')
+    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $LOGGING/%a.out -e $LOGGING/%a.err --array=1-$n_submit -J batch_3d $BINDIR/'build-3d.bash')
     log "submitted batch with job_id=$job_id"
 
+    n_uniq=0
     once=true
     while [ "$n_uniq" -ge $MAX_BATCHES ] || ! [ -z $once ]; do
         [ -z $once ] && sleep 120
