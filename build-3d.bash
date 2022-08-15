@@ -23,6 +23,7 @@ export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
 export COMMON_DIR=$LONGCACHE/build_3d_common
 export PYTHONBASE=$COMMON_DIR/$PYENV_VERSION
 export DOCKBASE=$COMMON_DIR/${DOCK_VERSION}
+export CORINA_VERSION=${CORINA_VERSION-corina-2025}
 
 if ! [ -d $COMMON_DIR ]; then
         mkdir -p $COMMON_DIR
@@ -81,7 +82,7 @@ function extract_cmd {
 }
 
 # added an additional check to make sure software dir isn't empty, since this seems to have happened before
-for software in $DOCK_VERSION $PYENV_VERSION lib openbabel-install jchem-19.15 corina; do
+for software in $DOCK_VERSION $PYENV_VERSION lib openbabel-install jchem-19.15 $CORINA_VERSION; do
 	(
 		flock -x 9
 		if ! [ -f $COMMON_DIR/$software/.done ] || [ $(ls $COMMON_DIR/$software | wc -l) -eq 0 ]; then
@@ -187,7 +188,7 @@ export OMEGA_RMSD=0.5
 # Dependencies
 
 # CORINA env.sh on wynton has an incorrect path specified
-export PATH="$COMMON_DIR/corina:${PATH}"
+export PATH="$COMMON_DIR/$CORINA_VERSION:${PATH}"
 
 # so does openbabel
 export OBABELBASE=$COMMON_DIR/openbabel-install
