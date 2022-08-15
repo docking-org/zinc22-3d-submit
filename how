@@ -1,3 +1,0 @@
-rm -r /dev/shm/3dbuild_xyz/test_1.build-3d.d/
-rm -r /tmp/btout/save
-./build-3d.bash
