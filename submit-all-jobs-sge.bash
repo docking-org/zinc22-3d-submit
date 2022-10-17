@@ -52,6 +52,7 @@ exists_warning LINES_PER_BATCH "number of SMILES per job array batch" 50000
 exists_warning LINES_PER_JOB "number of SMILES per job array element" 50
 exists_warning BATCH_RESUBMIT_THRESHOLD "minimum percentage of entries in an array batch that are complete before batch is considered complete" 80
 exists_warning SOFT_HOME "nfs directory where software is stored" $HOME
+exists_warning BUILD_MOL2 "build from mol2 files instead of smiles. input entries should be paths to mol2 files instead of smiles" 
 JOBS_PER_BATCH=$((LINES_PER_BATCH/LINES_PER_JOB))
 
 [ $failed -eq 1 ] && exit
@@ -139,9 +140,15 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 
     echo $var_args
 
+    if [ -z $BUILD_MOL2 ]; then
+            BUILD_SCRIPT="build-3d.bash"
+    else
+            BUILD_SCRIPT="build-3d-mol2.bash"
+    fi
+
     QSUB_ARGS=${QSUB_ARGS-"-l s_rt=01:58:00 -l h_rt=02:00:00"}
     # very annoying having to export environment variables like this
-    qsub $QSUB_ARGS -cwd -o $LOGGING/\$TASK_ID.out -e $LOGGING\$TASK_ID.err $var_args -N batch_3d -t 1-$n_submit 'build-3d.bash'
+    qsub $QSUB_ARGS -cwd -o $LOGGING/\$TASK_ID.out -e $LOGGING\$TASK_ID.err $var_args -N batch_3d -t 1-$n_submit $BINDIR/$BUILD_SCRIPT
     log "submitted batch"
 
     n_uniq=0

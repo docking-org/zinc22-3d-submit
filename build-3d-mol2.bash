@@ -27,37 +27,10 @@ if ! [ -d $COMMON_DIR ]; then
         chmod 777 $COMMON_DIR
 fi
 
-# wipe out legacy directories if they're here
-#if   [ -d $TEMPDIR/build_3d_$(whoami) ]; then
-#        rm -r $TEMPDIR/build_3d_$(whoami)
-#elif [ -d $TEMPDIR/build_3d ]; then
-#        rm -r $TEMPDIR/build_3d
-#fi
-
 JOB_ID=${SLURM_ARRAY_JOB_ID-$JOB_ID}
 TASK_ID=${SLURM_ARRAY_TASK_ID-$SGE_TASK_ID}
 
 mkdir -p $WORK_DIR
-
-# deprecated (and jank as hell)
-#function synchronize_all_but_first {
-#        if [ -f /tmp/${1}.done ]; then 
-#		if [ $(( (`date +%s` - `stat -L --format %Y /tmp/${1}.done`) > (10) )) ]; then
-#			rm /tmp/${1}.done
-#		else
-#			return;
-#		fi
-#	fi # in the case of a particularly short running command, it might be done by the time another job even enters this function
-#        flock -n /tmp/${1}.lock -c "printf ${1}; ${@:2} || echo command failed; echo > /tmp/${1}.done" && FIRST=TRUE
-#        if [ -z $FIRST ]; then
-#                printf "waiting ${1}"
-#                n=0
-#                while ! [ -f /tmp/${1}.done ]; do sleep 0.1; n=$((n+1)); if [ $n -eq 10 ]; then printf "."; n=0; fi; done
-#        else
-#                sleep 1 && rm /tmp/${1}.done
-#        fi
-#	echo
-#}
 
 # any jobs that were cancelled previously should be cleaned up
 old_work=$(find $WORK_DIR -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -name '*.build-3d.d' | wc -l)
@@ -210,11 +183,12 @@ source $PYTHONBASE/bin/activate
 
 ##### end initialize environment 
 
+dsave=$PWD
 #source $cwd/env_new_lig_build.sh
 # export DEBUG=TRUE
 # this env variable used for debugging old versions only
-MAIN_SCRIPT_NAME=${MAIN_SCRIPT_NAME-build_database_ligand_strain_noH_btingle.sh}
-${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME -H 7.4 --no-db $(basename $TARGET_FILE) &
+MAIN_SCRIPT_NAME=${MAIN_SCRIPT_NAME-build_ligands_from_mol2.py}
+python ${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME $(cat $TARGET_FILE) &
 genpid=$!
 
 function signal_generate_ligands {
@@ -234,5 +208,5 @@ fi
 
 log "finished build job on $TARGET_FILE"
 
-mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
-cleanup 0
+mv output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
+#cleanup 0

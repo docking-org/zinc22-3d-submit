@@ -58,6 +58,7 @@ exists_warning LINES_PER_BATCH "number of SMILES per job array batch" 50000
 exists_warning LINES_PER_JOB "number of SMILES per job array element" 50
 exists_warning BATCH_RESUBMIT_THRESHOLD "minimum percentage of entries in an array batch that are complete before batch is considered complete" 80
 exists_warning SOFT_HOME "nfs directory where software is stored" $HOME
+exists_warning BUILD_MOL2 "build from mol2 files instead of smiles. input entries should be paths to mol2 files instead of smiles"
 JOBS_PER_BATCH=$((LINES_PER_BATCH/LINES_PER_JOB))
 
 [ $failed -eq 1 ] && exit
@@ -141,7 +142,12 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     #echo $var_args
 
     SBATCH_ARGS=${SBATCH_ARGS-"--time=02:00:00"}
-    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $LOGGING/%a.out -e $LOGGING/%a.err --array=1-$n_submit -J batch_3d $BINDIR/'build-3d.bash')
+    if [ -z $BUILD_MOL2 ]; then
+	    BUILD_SCRIPT="build-3d.bash"
+    else
+	    BUILD_SCRIPT="build-3d-mol2.bash"
+    fi
+    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $LOGGING/%a.out -e $LOGGING/%a.err --array=1-$n_submit -J batch_3d $BINDIR/$BUILD_SCRIPT)
     log "submitted batch with job_id=$job_id"
 
     n_uniq=0
