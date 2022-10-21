@@ -22,6 +22,10 @@ export PYTHONBASE=$COMMON_DIR/$PYENV_VERSION
 export DOCKBASE=$COMMON_DIR/${DOCK_VERSION}
 export CORINA_VERSION=${CORINA_VERSION-corina-2025}
 
+if [ -f $SOFT_HOME/soft/${DOCK_VERSION}.tar.gz ]; then
+	SOFT_HOME=$SOFT_HOME/soft
+fi
+
 if ! [ -d $COMMON_DIR ]; then
         mkdir -p $COMMON_DIR
         chmod 777 $COMMON_DIR
@@ -48,7 +52,7 @@ old_logs=$(find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -n
 #       other waiting threads that it's okay to move on, which is what I do in the synchronize_all_but_first function
 
 function extract_cmd {
-	tar -C $COMMON_DIR -xzf $SOFT_HOME/soft/$1.tar.gz && echo > $COMMON_DIR/$1/.done
+	tar -C $COMMON_DIR -xzf $SOFT_HOME/$1.tar.gz && echo > $COMMON_DIR/$1/.done
 }
 
 # added an additional check to make sure software dir isn't empty, since this seems to have happened before
@@ -209,4 +213,4 @@ fi
 log "finished build job on $TARGET_FILE"
 
 mv output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
-#cleanup 0
+cleanup 0

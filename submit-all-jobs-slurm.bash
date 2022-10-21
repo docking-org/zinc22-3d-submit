@@ -147,7 +147,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     else
 	    BUILD_SCRIPT="build-3d-mol2.bash"
     fi
-    job_id1=$(sbatch --partition=tldr $SBATCH_ARGS --parsable --signal=USR1@120 -o $LOGGING/%a.out -e $LOGGING/%a.err --array=1-$n_submit%20 -J batch_3d 'build-3d.bash' | sed 's/Submitted batch job //')
+    job_id1=$(sbatch --partition=tldr $SBATCH_ARGS --parsable --signal=USR1@120 -o $LOGGING/%a.out -e $LOGGING/%a.err --array=1-$n_submit%20 -J batch_3d $BINDIR/$BUILD_SCRIPT | sed 's/Submitted batch job //')
     log "submitted batch with job_id=$job_id1"
     echo "$job_id1" > $OUTPUT_DEST/jobid
 
@@ -166,5 +166,5 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 
 done
 job_id1=$( cat ${OUTPUT_DEST}/jobid )
-jid2=$(sbatch  -t 00:10:00 --partition='tldr' --dependency=afterok:$job_id1 -o $INPUT_PATH/%A.out -e $INPUT_PATH/%A.err '/nfs/ex7/blaster/templates/newbuild3d/result_new_build3d.bash' $INPUT_PATH)
+jid2=$(sbatch  -t 00:10:00 --partition='tldr' --dependency=afterok:$job_id1 -o $INPUT_PATH/log -e $INPUT_PATH/log '/nfs/ex7/blaster/templates/newbuild3d/result_new_build3d.bash' $INPUT_PATH)
 log "submitted dependency with job_id=$jid2"

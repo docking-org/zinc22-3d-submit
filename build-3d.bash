@@ -22,6 +22,10 @@ export PYTHONBASE=$COMMON_DIR/$PYENV_VERSION
 export DOCKBASE=$COMMON_DIR/${DOCK_VERSION}
 export CORINA_VERSION=${CORINA_VERSION-corina-2025}
 
+if [ -f $SOFT_HOME/soft/${DOCK_VERSION}.tar.gz ]; then
+	SOFT_HOME=$SOFT_HOME/soft
+fi
+
 if ! [ -d $COMMON_DIR ]; then
         mkdir -p $COMMON_DIR
         chmod 777 $COMMON_DIR
@@ -75,7 +79,7 @@ old_logs=$(find $SHRTCACHE -mindepth 1 -maxdepth 1 -user $(whoami) -mmin +180 -n
 #       other waiting threads that it's okay to move on, which is what I do in the synchronize_all_but_first function
 
 function extract_cmd {
-	tar -C $COMMON_DIR -xzf $SOFT_HOME/soft/$1.tar.gz && echo > $COMMON_DIR/$1/.done
+	tar -C $COMMON_DIR -xzf $SOFT_HOME/$1.tar.gz && echo > $COMMON_DIR/$1/.done
 }
 
 # added an additional check to make sure software dir isn't empty, since this seems to have happened before
@@ -195,9 +199,10 @@ export PATH="${PATH}:${OBABELBASE}/bin"
 
 # aaand jchem too. all the software
 # activate the openeye license
-export OE_LICENSE=$SOFT_HOME/.oe-license.txt
+LICENSE_HOME=${LICENSE_HOME-$SOFT_HOME}
+export OE_LICENSE=$LICENSE_HOME/.oe-license.txt
 export CHEMAXON_PATH=$COMMON_DIR/jchem-19.15
-export CHEMAXON_LICENSE_URL=$SOFT_HOME/.jchem-license.cxl
+export CHEMAXON_LICENSE_URL=$LICENSE_HOME/.jchem-license.cxl
 export PATH="$PATH:$CHEMAXON_PATH/bin"
 
 LIMIT_JAVA="${DOCKBASE}/common/java-thread-limiter/mock-num-cpus 2"
