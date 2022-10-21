@@ -57,7 +57,8 @@ exists_warning MAX_BATCHES "max no. of job arrays submitted at one time" 25
 exists_warning LINES_PER_BATCH "number of SMILES per job array batch" 50000
 exists_warning LINES_PER_JOB "number of SMILES per job array element" 50
 exists_warning BATCH_RESUBMIT_THRESHOLD "minimum percentage of entries in an array batch that are complete before batch is considered complete" 80
-exists_warning SOFT_HOME "nfs directory where software is stored" $HOME
+exists_warning SOFT_HOME "nfs directory where software is stored" $HOME/soft
+exists_warning LICENSE_HOME "nfs directory where licenses are stored" $HOME
 exists_warning BUILD_MOL2 "build from mol2 files instead of smiles. input entries should be paths to mol2 files instead of smiles"
 JOBS_PER_BATCH=$((LINES_PER_BATCH/LINES_PER_JOB))
 
@@ -135,11 +136,10 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     mkdir -p $OUTPUT
     mkdir -p $LOGGING
 
-    for var in RESUBMIT OUTPUT INPUT LOGGING SHRTCACHE LONGCACHE; do
-	    [ -z "$var_args" ] && var_args="-v $var=${!var}" || var_args="$var_args -v $var=${!var}"
-    done
-
-    #echo $var_args
+    # dont need to do this for slurm
+    #for var in RESUBMIT OUTPUT INPUT LOGGING SHRTCACHE LONGCACHE SOFT_HOME LICENSE_HOME BUILD_MOL2; do
+    #    [ -z "$var_args" ] && var_args="-v $var=${!var}" || var_args="$var_args -v $var=${!var}"
+    #done
 
     SBATCH_ARGS=${SBATCH_ARGS-"--time=02:00:00"}
     if [ -z $BUILD_MOL2 ]; then
@@ -147,9 +147,8 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     else
 	    BUILD_SCRIPT="build-3d-mol2.bash"
     fi
-    job_id1=$(sbatch --partition=tldr $SBATCH_ARGS --parsable --signal=USR1@120 -o $LOGGING/%a.out -e $LOGGING/%a.err --array=1-$n_submit%20 -J batch_3d $BINDIR/$BUILD_SCRIPT | sed 's/Submitted batch job //')
-    log "submitted batch with job_id=$job_id1"
-    echo "$job_id1" > $OUTPUT_DEST/jobid
+    job_id=$(sbatch $SBATCH_ARGS --parsable --signal=USR1@120 -o $LOGGING/%a.out -e $LOGGING/%a.err --array=1-$n_submit%20 -J batch_3d $BINDIR/$BUILD_SCRIPT)
+    log "submitted batch with job_id=$job_id"
 
     n_uniq=0
     once=true
@@ -165,6 +164,3 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     log n_jobs=$n_jobs
 
 done
-job_id1=$( cat ${OUTPUT_DEST}/jobid )
-jid2=$(sbatch  -t 00:10:00 --partition='tldr' --dependency=afterok:$job_id1 -o $INPUT_PATH/log -e $INPUT_PATH/log '/nfs/ex7/blaster/templates/newbuild3d/result_new_build3d.bash' $INPUT_PATH)
-log "submitted dependency with job_id=$jid2"

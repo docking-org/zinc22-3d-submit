@@ -51,7 +51,8 @@ exists_warning MAX_BATCHES "max no. of job arrays submitted at one time" 25
 exists_warning LINES_PER_BATCH "number of SMILES per job array batch" 50000
 exists_warning LINES_PER_JOB "number of SMILES per job array element" 50
 exists_warning BATCH_RESUBMIT_THRESHOLD "minimum percentage of entries in an array batch that are complete before batch is considered complete" 80
-exists_warning SOFT_HOME "nfs directory where software is stored" $HOME
+exists_warning SOFT_HOME "nfs directory where software is stored" $HOME/soft
+exists_warning LICENSE_HOME "nfs directory where licenses are stored" $HOME
 exists_warning BUILD_MOL2 "build from mol2 files instead of smiles. input entries should be paths to mol2 files instead of smiles" 
 JOBS_PER_BATCH=$((LINES_PER_BATCH/LINES_PER_JOB))
 
@@ -134,7 +135,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
     mkdir -p $OUTPUT
     mkdir -p $LOGGING
 
-    for var in RESUBMIT OUTPUT INPUT LOGGING SHRTCACHE LONGCACHE SOFT_HOME CORINA_MAX_CONFS DOCK_VERSION; do
+    for var in RESUBMIT OUTPUT INPUT LOGGING SHRTCACHE LONGCACHE SOFT_HOME CORINA_MAX_CONFS DOCK_VERSION BUILD_MOL2 LICENSE_HOME; do
 	    [ -z "$var_args" ] && var_args="-v $var=${!var}" || var_args="$var_args -v $var=${!var}"
     done
 
