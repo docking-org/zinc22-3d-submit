@@ -49,8 +49,10 @@ function exists_warning {
 }
 
 failed=0
+echo
 exists INPUT_FILE "input SMILES for 3d building"
 exists OUTPUT_DEST "nfs destination for db2, logs, split input files"
+echo
 exists_warning SHRTCACHE "short term storage for working files" /dev/shm
 exists_warning LONGCACHE "long term storage for program files" /tmp
 exists_warning MAX_BATCHES "max no. of job arrays submitted at one time" 25

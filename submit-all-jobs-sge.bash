@@ -43,8 +43,10 @@ function exists_warning {
 }
 
 failed=0
+echo
 exists INPUT_FILE "input SMILES for 3d building"
 exists OUTPUT_DEST "nfs destination for db2, logs, split input files"
+echo
 exists_warning SHRTCACHE "short term storage for working files" /dev/shm
 exists_warning LONGCACHE "long term storage for program files" /tmp
 exists_warning MAX_BATCHES "max no. of job arrays submitted at one time" 25
@@ -149,7 +151,7 @@ for batch_50K in $OUTPUT_DEST/in/*; do
 
     QSUB_ARGS=${QSUB_ARGS-"-l s_rt=01:58:00 -l h_rt=02:00:00"}
     # very annoying having to export environment variables like this
-    qsub $QSUB_ARGS -cwd -o $LOGGING/\$TASK_ID.out -e $LOGGING\$TASK_ID.err $var_args -N batch_3d -t 1-$n_submit $BINDIR/$BUILD_SCRIPT
+    qsub $QSUB_ARGS -cwd -o $LOGGING/\$TASK_ID.out -e $LOGGING/\$TASK_ID.err $var_args -N batch_3d -t 1-$n_submit $BINDIR/$BUILD_SCRIPT
     log "submitted batch"
 
     n_uniq=0
