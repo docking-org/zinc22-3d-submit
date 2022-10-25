@@ -15,12 +15,15 @@ export BUILD_DIR=3dbuild_$(whoami)
 export SHRTCACHE=${SHRTCACHE-/scratch}
 export LONGCACHE=${LONGCACHE-/scratch}
 export WORK_DIR=$SHRTCACHE/$BUILD_DIR
-export DOCK_VERSION=${DOCK_VERSION-DOCK.3.8.4.2.3d}
-export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
 export COMMON_DIR=$LONGCACHE/build_3d_common
+
+export DOCK_VERSION=${DOCK_VERSION-DOCK.3.8.4.2.3d}
+export CORINA_VERSION=${CORINA_VERSION-corina-2025}
+export PYENV_VERSION=${PYENV_VERSION-lig_build_py3-3.7.1}
+export JCHEM_VERSION=${JCHEM_VERSION-jchem-19.15.r0}
+
 export PYTHONBASE=$COMMON_DIR/$PYENV_VERSION
 export DOCKBASE=$COMMON_DIR/${DOCK_VERSION}
-export CORINA_VERSION=${CORINA_VERSION-corina-2025}
 
 if [ -f $SOFT_HOME/soft/${DOCK_VERSION}.tar.gz ]; then
 	SOFT_HOME=$SOFT_HOME/soft
@@ -56,7 +59,7 @@ function extract_cmd {
 }
 
 # added an additional check to make sure software dir isn't empty, since this seems to have happened before
-for software in $DOCK_VERSION $PYENV_VERSION lib openbabel-install jchem-19.15 $CORINA_VERSION; do
+for software in $DOCK_VERSION $PYENV_VERSION lib openbabel-install $JCHEM_VERSION $CORINA_VERSION; do
 	(
 		flock -x 9
 		if ! [ -f $COMMON_DIR/$software/.done ] || [ $(ls $COMMON_DIR/$software | wc -l) -eq 0 ]; then
