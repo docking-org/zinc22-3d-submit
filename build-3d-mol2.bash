@@ -176,7 +176,7 @@ export PATH="${PATH}:${OBABELBASE}/bin"
 # aaand jchem too. all the software
 # activate the openeye license
 export OE_LICENSE=$SOFT_HOME/.oe-license.txt
-export CHEMAXON_PATH=$COMMON_DIR/jchem-19.15
+export CHEMAXON_PATH=$COMMON_DIR/$JCHEM_VERSION
 export CHEMAXON_LICENSE_URL=$SOFT_HOME/.jchem-license.cxl
 export PATH="$PATH:$CHEMAXON_PATH/bin"
 
