@@ -141,16 +141,16 @@ log LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 export EMBED_PROTOMERS_3D_EXE=$DOCKBASE/ligand/3D/embed3d_corina.sh
 # parameters related to omega
 # set omega energy window, if it equals 0, rotatable-bond-dependent window method.
-export OMEGA_ENERGY_WINDOW=12
+export OMEGA_ENERGY_WINDOW=${OMEGA_ENERGY_WINDOW-12}
 # set omega max number of confs, if it equals 0, rotatable-bond-dependent window method.
 export OMEGA_MAX_CONFS=${OMEGA_MAX_CONFS-600}
 # set the omega torsion library: 1) Original; 2) GubaV21
-export OMEGA_TORLIB=Original
+export OMEGA_TORLIB=${OMEGA_TORLIB-Original}
 # set the omega force field. Options are in the link below
 # https://docs.eyesopen.com/toolkits/cpp/oefftk/OEFFConstants/OEMMFFSheffieldFFType.html#OEFF::OEMMFFSheffieldFFType::MMFF94Smod
-export OMEGA_FF=MMFF94Smod
+export OMEGA_FF=${OMEGA_FF-MMFF94Smod}
 # set the omega rmsd for clustering and filtering conformations, if it equals 0, rotatable-bond-dependent window method.
-export OMEGA_RMSD=0.5
+export OMEGA_RMSD=${OMEGA_RMSD-0.5}
 
 # Dependencies
 
@@ -194,9 +194,12 @@ if ! [ $BUILD_MOL2 = "true" ]; then
 	${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME -H 7.4 --no-db $(basename $TARGET_FILE) &
 	genpid=$!
 else
+	mkdir working
+	cd working
 	MAIN_SCRIPT_NAME=${MAIN_SCRIPT_NAME-build_ligands_from_mol2.py}
 	python ${DOCKBASE}/ligand/generate/$MAIN_SCRIPT_NAME $(cat $TARGET_FILE) &
 	genpid=$!
+	cd ..
 fi
 
 function signal_generate_ligands {
