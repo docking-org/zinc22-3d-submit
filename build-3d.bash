@@ -151,6 +151,8 @@ export OMEGA_TORLIB=${OMEGA_TORLIB-Original}
 export OMEGA_FF=${OMEGA_FF-MMFF94Smod}
 # set the omega rmsd for clustering and filtering conformations, if it equals 0, rotatable-bond-dependent window method.
 export OMEGA_RMSD=${OMEGA_RMSD-0.5}
+# orrrr ignore all this crap and skip omega conf generation, if specified
+export SKIP_OMEGA=$SKIP_OMEGA
 
 # Dependencies
 
