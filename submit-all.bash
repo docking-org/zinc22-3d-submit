@@ -75,7 +75,7 @@ for soft_prefix in dock jchem corina pyenv openbabel extralibs; do
 	soft_varname=${soft_prefix_upper}_VERSION
 	soft_varvalu=${!soft_varname}
 	latest_basename=$(echo $latest | rev | cut -d'.' -f3- | rev)
-	if [ -z $soft_varval ]; then
+	if [ -z $soft_varvalu ]; then
 		echo export ${soft_varname}=${latest_basename}
 		export ${soft_varname}=${latest_basename}
 	elif [ $soft_varvalue != $latest_basename ]; then
