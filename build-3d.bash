@@ -77,7 +77,7 @@ WORK_BASE=$SHRTCACHE/$(whoami)_build3d/${JOB_ID}/${TASK_ID}
 mkdir -p $WORK_BASE
 
 if [ -z $RESUBMIT ]; then
-	SPLIT_FILE=$INPUT/`ls $INPUT | tr '\n' ' ' | cut -d' ' -f$TASK_ID`
+	SPLIT_FILE=$INPUT/`ls $INPUT | sort | tr '\n' ' ' | cut -d' ' -f$TASK_ID`
 	TARGET_FILE=$WORK_BASE/$TASK_ID
 else
 	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$TASK_ID`
@@ -109,7 +109,7 @@ reached_time_limit() {
         mkdir -p $OUTPUT/save
         mv $(basename $TARGET_FILE).save.tar.gz $OUTPUT/save
         popd $WORK_BASE
-	cleanup 99
+	exit 99
 }
 
 # on sge, SIGUSR1 is sent once a job surpasses it's "soft" time limit (-l s_rt=XX:XX:XX), usually specified a minute or two before the hard time limit (-l h_rt=XX:XX:XX) where SIGTERM is sent
@@ -118,16 +118,17 @@ reached_time_limit() {
 
 # jobs that have output already shouldn't be resubmitted, but this is just in case that doesn't happen
 if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
-        log "results already present in $OUTPUT_BASE for this job, exiting..."
-        cleanup 0
+        log "results already present in $OUTPUT for this job, exiting..."
+        exit 0
 fi
 
+# commenting out for now - restartability is glitchy
 # un-archive our saved progress (if any) into the current working directory
-if [ -f $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz ]; then
-        echo "saved progress found!"
-	tar -xzf $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz .
-        rm $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz
-fi
+#if [ -f $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz ]; then
+#        echo "saved progress found!"
+#	tar -xzf $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz .
+#        rm $OUTPUT/save/$(basename $TARGET_FILE).save.tar.gz
+#fi
 
 ##### start initialize environment. Moving this from env_new_lig_build.sh to here so everything fits in one file
 
@@ -221,5 +222,10 @@ fi
 
 log "finished build job on $TARGET_FILE"
 
+actual_entries=$(tar tf working/output.tar.gz | wc -l)
+if [ $actual_entries -eq 0 ]; then
+	log "detected nothing in our output!"
+	exit 1
+fi
 mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
 exit 0
