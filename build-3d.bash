@@ -16,6 +16,7 @@ export COMMON_DIR=$LONGCACHE/build_3d_common_$(whoami)
 #export COMMON_DIR=$LONGCACHE/build_3d_common/
 
 # don't set default version in here- do it in submit-all.bash
+
 export DOCK_VERSION=${DOCK_VERSION}
 export CORINA_VERSION=${CORINA_VERSION}
 export PYENV_VERSION=${PYENV_VERSION}
@@ -56,12 +57,15 @@ function log {
 }
 function extract_cmd {
 	log "extracting $1"
-	tar -C $COMMON_DIR -xzf $SOFT_HOME/$1.tar.gz && echo > $COMMON_DIR/$1/.done
+	# add the "-m" argument here for an important reason-
+	# if extracting to a temporary directory with automated cleanup, we don't want it to think that these files are old
+	tar -m -C $COMMON_DIR -xzf $SOFT_HOME/$1.tar.gz && echo > $COMMON_DIR/$1/.done
 }
 
 # added an additional check to make sure software dir isn't empty, since this seems to have happened before
 # "lib" is a bandaid to fix some libraries that weren't found- can probably include most of it with openbabel-install
 for software in $DOCK_VERSION $PYENV_VERSION $EXTRALIBS_VERSION $OPENBABEL_VERSION $JCHEM_VERSION $CORINA_VERSION $EXTRALIBS_VERSION; do
+	log $software
 	(
 		flock -x 9
 		if ! [ -f $COMMON_DIR/$software/.done ] || [ $(ls $COMMON_DIR/$software | wc -l) -eq 0 ]; then
@@ -80,7 +84,7 @@ if [ -z $RESUBMIT ]; then
 	SPLIT_FILE=$INPUT/`ls $INPUT | sort | tr '\n' ' ' | cut -d' ' -f$TASK_ID`
 	TARGET_FILE=$WORK_BASE/$TASK_ID
 else
-	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | tr '\n' ' ' | cut -d' ' -f$TASK_ID`
+	SPLIT_FILE=$INPUT/resubmit/`ls $INPUT/resubmit | sort -n | tr '\n' ' ' | cut -d' ' -f$TASK_ID`
 	TARGET_FILE=$WORK_BASE/$(basename $SPLIT_FILE)
 fi
 
@@ -118,7 +122,7 @@ reached_time_limit() {
 
 # jobs that have output already shouldn't be resubmitted, but this is just in case that doesn't happen
 if [ -f $OUTPUT/$(basename $TARGET_FILE).tar.gz ]; then
-        log "results already present in $OUTPUT for this job, exiting..."
+	log "results already present in $OUTPUT/$(basename $TARGET_FILE).tar.gz for this job, exiting..."
         exit 0
 fi
 
@@ -189,6 +193,7 @@ log $(which python) ::: $(which python3) :::
 
 ##### end initialize environment 
 
+export HOME=$WORK_BASE # silly chemaxon install4j module tries to write to global /nfs/home/$USER which is bad bad bad
 #source $cwd/env_new_lig_build.sh
 # export DEBUG=TRUE
 # this env variable used for debugging old versions only
@@ -216,6 +221,8 @@ while [ -z "$(kill -0 $genpid 2>&1)" ]; do
 	sleep 5
 done
 
+ls -la $WORK_BASE
+
 if ! [ -z $received_sigusr ]; then
         reached_time_limit
 fi
@@ -225,6 +232,7 @@ log "finished build job on $TARGET_FILE"
 actual_entries=$(tar tf working/output.tar.gz | wc -l)
 if [ $actual_entries -eq 0 ]; then
 	log "detected nothing in our output!"
+	rm working/output.tar.gz
 	exit 1
 fi
 mv working/output.tar.gz $OUTPUT/$(basename $TARGET_FILE).tar.gz
